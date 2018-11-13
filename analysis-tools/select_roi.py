@@ -1,10 +1,5 @@
-import sys
-from PyQt5.QtWidgets import QDialog, QApplication, QPushButton, QVBoxLayout
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.widgets import RectangleSelector
 from matplotlib import pyplot as plt
-import random
 
 #Testing imports
 from skimage import io, exposure, img_as_float, img_as_ubyte, morphology, filters, util
@@ -32,7 +27,6 @@ class RectangleSelection(object):
         plt.show()
 
     def onselect(self, e_click, e_release):
-        print('Press q to confirm selection and exit')
         minRow = int(min(e_click.ydata, e_release.ydata))
         minCol = int(min(e_click.xdata, e_release.xdata))
         maxRow = int(max(e_click.ydata, e_release.ydata))
@@ -54,6 +48,8 @@ def select_rectangle(img):
     '''
 
     selector = RectangleSelection(img)
+
+    print('Select the region of interest then press Q/q to confirm selection and exit.')
 
     plt.close(selector.fig)
 

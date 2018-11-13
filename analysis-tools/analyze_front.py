@@ -1,22 +1,19 @@
 import numpy as np
-import plotly.graph_objs as go
 import pandas as pd
 from matplotlib import pyplot as plt
-import matplotlib.patches as mpatches
 from matplotlib.widgets import RectangleSelector
 import seaborn as sns
 import av
 import cv2
 
 import skimage
-from skimage import io, exposure, img_as_float, img_as_ubyte, morphology, filters, util
-from skimage.color import rgb2gray, label2rgb
-from skimage.feature import canny, blob_dog, blob_log, blob_doh
-from skimage.filters import sobel, threshold_otsu, try_all_threshold, threshold_local, threshold_minimum
-from skimage.segmentation import clear_border
+from skimage import io, img_as_ubyte
+from skimage.color import rgb2gray
+from skimage.filters import threshold_minimum
 from skimage.measure import label, regionprops
 from skimage.morphology import closing, square
-from skimage.color import label2rgb
+
+from joblib import Parallel, delayed
 
 import os
 
@@ -49,7 +46,9 @@ def determine_threshold(stack):
     return threshold_minimum(img)
 
 
-def analyze_image(img, thresh, expName, stackIdx):
+def analyze_front(img, thresh, expName, stackIdx):
+    """Find the portion of the image with ice and determine the coordinates of the bounding box
+    """
     #Threshold the image using the global threshold
     img_min_thresh = img > thresh
     # Closing
@@ -64,8 +63,27 @@ def analyze_image(img, thresh, expName, stackIdx):
     area = largest.area
     return [expName, stackIdx, area, minr, minc, maxr, maxc, area / img.shape[0]]
 
-
-
+def process_movie(file, df_crop):
+    """Process a stack of images to determine the progress of the ice front.
+    """
+    #Extract experiment name from filename
+    name = file.split('.')[0].split('/')[2]
+    #Open the file and get a stack of grayscale images
+    stack = open_video(file)
+    #Select the region of interest
+    (minRow, minCol, maxRow, maxCol) = df_crop[df_crop['ExpName'] == name]['CroppingBox'].iloc[0]
+    #Crop the stack to the right dimensions
+    stack_cropped = [img[minRow:maxRow,minCol:maxCol] for img in stack]
+    #Determine the threshold
+    min_thresh = determine_threshold(stack_cropped)
+    #Create a dataframe to hold the data
+    col_names = ['ExpName','Frame #', 'Area', 'MinRow', 'MinCol', 'MaxRow', 'MaxCol','HeightPx']
+    df = pd.DataFrame(columns=col_names)
+    #Analyze pics and drop data in df
+    for i in range(len(stack)):
+        df.loc[i] = analyze_front(stack[i], min_thresh, name, i)
+    #Return the dataframe
+    return df
 
 if __name__ == '__main__':
 
@@ -75,39 +93,33 @@ if __name__ == '__main__':
     file_list = [working_dir + '/' + file for file in os.listdir(working_dir) if file.endswith('.avi')]
     print("Files to process: " + str(file_list))
 
-    #Create a dataframe to hold the data
-    col_names = ['ExpName','Frame #', 'Area', 'MinRow', 'MinCol', 'MaxRow', 'MaxCol','HeightPx']
-    df = pd.DataFrame(columns=col_names)
+    #Process the movies
 
-    #Create a dataframe to hold the cropping boxes
-    columns = ['ExpName', 'CroppingBox']
-    df_crop = pd.DataFrame(columns=columns)
+    #If the movies have been processed already, load from disk, otherwise, process
+    savepath = working_dir+"/"+"ProcessedData"+".pkl"
 
-    #Determine the bounding boxes
-    for file in file_list:
-        #Extract experiment name from filename
-        name = file.split('.')[0].split('/')[2]
-        #Open the file and get a stack of grayscale images
-        stack = open_video(file)
-        #Select the region of interest
-        df_crop = df_crop.append({'ExpName':name, 'CroppingBox':select_roi.select_rectangle(stack[len(stack)- 10])}, ignore_index=True)
-
-    #Analyse the Movies (parallel)
-    for file in file_list:
-        #Extract experiment name from filename
-        name = file.split('.')[0].split('/')[2]
-        #Open the file and get a stack of grayscale images
-        stack = open_video(file)
-        #Select the region of interest
-        (minRow, minCol, maxRow, maxCol) = df_crop[df_crop['ExpName'] == name]['CroppingBox'].iloc[0]
-        #Crop the stack to the right dimensions
-        stack_cropped = [img[minRow:maxRow,minCol:maxCol] for img in stack]
-        #Determine the threshold
-        min_thresh = determine_threshold(stack_cropped)
-        #Analyze pics and drop data in df
-        l = df.size
-        for i in range(len(stack)):
-            df.loc[l+i] = analyze_image(stack[i], min_thresh, name, i)
+    if os.path.isfile(savepath):
+        df = pd.read_pickle(savepath)
+        print("Data loaded from disk")
+    else:
+        print("Did not find data, processing movies")
+        #Create a dataframe to hold the cropping boxes
+        columns = ['ExpName', 'CroppingBox']
+        df_crop = pd.DataFrame(columns=columns)
+        #Determine the bounding boxes
+        for file in file_list:
+            #Extract experiment name from filename
+            name = file.split('.')[0].split('/')[2]
+            #Open the file and get a stack of grayscale images
+            stack = open_video(file)
+            #Select the region of interest
+            df_crop = df_crop.append({'ExpName':name, 'CroppingBox':select_roi.select_rectangle(stack[len(stack)- 10])}, ignore_index=True)
+        #Run the movie analysis in parallel
+        df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, df_crop) for file in file_list)
+        #Merge all the dataframes in one and reindex
+        df = pd.concat(df_list).reset_index(drop=True)
+        #Save dataframe to disk
+        df.to_pickle(savepath)
 
     #Plot the height vs. time and save the graph
     f1 = plt.figure()
