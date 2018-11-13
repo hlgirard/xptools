@@ -49,3 +49,5 @@ Temporary Items
 # Ignore test movies and images
 test_movies/
 test_images/
+
+__pycache__/
