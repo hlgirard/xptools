@@ -1,14 +1,18 @@
+"""Analyze videos of a moving ice front and plot the positions as a function of time
+
+This module takes a directory containing video files. For each file, it asks the user to select a region of interest
+and processes the selected area with a minimum threshold to find the largest area. It then plots the height of this area as
+a function of time.
+
+Options
+-r: force reprocessing of the videos
+-p: use plotly instead of matplotlib for plotting
+-s: save the output graph
+"""
+
 # Data analysis
 import numpy as np
 import pandas as pd
-
-# Plotting
-from matplotlib import pyplot as plt
-from matplotlib.widgets import RectangleSelector
-import seaborn as sns
-import plotly
-import plotly.graph_objs as go
-import plotly.io as pio
 
 # Image analysis
 import av
@@ -112,12 +116,22 @@ def process_movie(file, df_crop):
 def plot_front_position(df, bSave, dirname):
     """Plot the height vs. time of the freezing front using matplotlib
     """
-    f1 = plt.figure()
-    sns.set()
-    sns.set_style("ticks")
-    sns.set_context("talk")
-    sns.set_style({"xtick.direction": "in","ytick.direction": "in"})
 
+    from matplotlib import pyplot as plt
+    from matplotlib.widgets import RectangleSelector
+    
+    f1 = plt.figure()
+
+    # Use seaborn if available
+    try:
+        import seaborn as sns
+        sns.set()
+        sns.set_style("ticks")
+        sns.set_context("talk")
+        sns.set_style({"xtick.direction": "in","ytick.direction": "in"})
+    except ImportError:
+        pass
+    
     p = []
 
     for i in range(len(df['ExpName'].unique())):
@@ -144,6 +158,10 @@ def plot_front_position(df, bSave, dirname):
 def plot_front_position_pltly(df, bSave, dirname):
     """Plot the height vs. time of the freezing front using plotly
     """
+
+    import plotly
+    import plotly.graph_objs as go
+    import plotly.io as pio
     
     data=[]
 
@@ -169,7 +187,6 @@ def plot_front_position_pltly(df, bSave, dirname):
 
     if bSave:
         pio.write_image(fig, dirname + '/' + 'FrontHeight.pdf')
-
 
 
 if __name__ == '__main__':
@@ -201,7 +218,7 @@ if __name__ == '__main__':
         df = pd.read_pickle(savepath)
         print("Data loaded from disk")
     else:
-        print("Did not find data, processing movies")
+        print("Processing movies")
         df_crop = obtain_cropping_boxes(file_list)
         #Run the movie analysis in parallel (one thread per movie)
         df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, df_crop) for file in file_list)
