@@ -44,7 +44,7 @@ class RectangleSelection(object):
 def select_rectangle(img):
     ''' Create a window requesting a rectangular selection on the passed image
 
-    Support multilple redos, press q to exit
+    Supports multiple redos, press q to exit
     '''
 
     selector = RectangleSelection(img)
