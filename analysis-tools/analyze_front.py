@@ -71,7 +71,10 @@ def obtain_cropping_boxes(file_list):
         #Open the file and get a stack of grayscale images
         stack = open_video(file)
         #Select the region of interest
-        df_crop = df_crop.append({'ExpName':name, 'CroppingBox':select_roi.select_rectangle(stack[len(stack)- 10])}, ignore_index=True)
+        rectangle = None
+        while rectangle == None:
+            rectangle = select_roi.select_rectangle(stack[len(stack)- 10])
+        df_crop = df_crop.append({'ExpName':name, 'CroppingBox':rectangle}, ignore_index=True)
     return df_crop
 
 def analyze_front(img, thresh, expName, stackIdx, scale, framerate):
