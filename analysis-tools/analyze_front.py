@@ -1,11 +1,18 @@
+# Data analysis
 import numpy as np
 import pandas as pd
+
+# Plotting
 from matplotlib import pyplot as plt
 from matplotlib.widgets import RectangleSelector
 import seaborn as sns
+import plotly
+import plotly.graph_objs as go
+import plotly.io as pio
+
+# Image analysis
 import av
 import cv2
-
 import skimage
 from skimage import io, img_as_ubyte
 from skimage.color import rgb2gray
@@ -13,11 +20,12 @@ from skimage.filters import threshold_minimum
 from skimage.measure import label, regionprops
 from skimage.morphology import closing, square
 
+# System
+import os
+import argparse
 from joblib import Parallel, delayed
 
-import os
-
-#Local imports
+# Local imports
 import select_roi
 
 def open_video(file):
@@ -85,43 +93,9 @@ def process_movie(file, df_crop):
     #Return the dataframe
     return df
 
-if __name__ == '__main__':
-
-    #TODO: generalize the working directory
-    working_dir = 'analysis-tools/test_movies'
-
-    file_list = [working_dir + '/' + file for file in os.listdir(working_dir) if file.endswith('.avi')]
-    print("Files to process: " + str(file_list))
-
-    #Process the movies
-
-    #If the movies have been processed already, load from disk, otherwise, process
-    savepath = working_dir+"/"+"ProcessedData"+".pkl"
-
-    if os.path.isfile(savepath):
-        df = pd.read_pickle(savepath)
-        print("Data loaded from disk")
-    else:
-        print("Did not find data, processing movies")
-        #Create a dataframe to hold the cropping boxes
-        columns = ['ExpName', 'CroppingBox']
-        df_crop = pd.DataFrame(columns=columns)
-        #Determine the bounding boxes
-        for file in file_list:
-            #Extract experiment name from filename
-            name = file.split('.')[0].split('/')[2]
-            #Open the file and get a stack of grayscale images
-            stack = open_video(file)
-            #Select the region of interest
-            df_crop = df_crop.append({'ExpName':name, 'CroppingBox':select_roi.select_rectangle(stack[len(stack)- 10])}, ignore_index=True)
-        #Run the movie analysis in parallel
-        df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, df_crop) for file in file_list)
-        #Merge all the dataframes in one and reindex
-        df = pd.concat(df_list).reset_index(drop=True)
-        #Save dataframe to disk
-        df.to_pickle(savepath)
-
-    #Plot the height vs. time and save the graph
+def plot_front_position(df, bSave, dirname):
+    """Plot the height vs. time of the freezing front
+    """
     f1 = plt.figure()
     sns.set()
     sns.set_style("ticks")
@@ -139,8 +113,6 @@ if __name__ == '__main__':
 
     plt.legend(fontsize=16,loc='lower right',frameon=True)
     axes = plt.gca()
-    axes.set_xlim([0,1000])
-    #axes.set_ylim([0,7])
     plt.xlabel('Time (s)',fontsize=20)
     plt.ylabel('Height of Front (px)',fontsize=20)
 
@@ -148,7 +120,89 @@ if __name__ == '__main__':
     plt.tick_params(axis='both', which='major', labelsize=18)
 
     f1.set_size_inches(8, 8)
-    print('Showing Plot')
     plt.show()
+
+    if bSave:
+        plt.savefig(dirname + '/' + 'FrontHeight.pdf', bbox_inches = 'tight')
+
+def plot_front_position_pltly(df, bSave, dirname):
+    
+    data=[]
+
+    for i in range(len(df['ExpName'].unique())):
+        data.append(go.Scatter(
+            x = df[df['ExpName'] == df['ExpName'].unique()[i]]['Frame #'],
+            y = df[df['ExpName'] == df['ExpName'].unique()[i]]['HeightPx'],
+            name = df['ExpName'].unique()[i]
+        ))
+
+    fig = go.Figure({
+        "data": data,
+        "layout": go.Layout(
+            width = 800,
+            height = 500,
+            xaxis=dict(title='Time (s)', linecolor = 'black',linewidth = 2, mirror = True),
+            yaxis=dict(title='Height of front (px)',linecolor = 'black',linewidth = 2, mirror = True),
+            showlegend=True
+        )}
+    )
+
+    plotly.offline.plot(fig, auto_open=True)
+
+    if bSave:
+        pio.write_image(fig, dirname + '/' + 'FrontHeight.pdf')
+
+
+
+if __name__ == '__main__':
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("directory", help="Path of the directory")
+    ap.add_argument("-r", "--reprocess", action='store_true', help="Force the reprocessing of the movies")
+    ap.add_argument("-p", "--plotly", action='store_true', help="Use plotly for graphing")
+    ap.add_argument("-s", "--save", action='store_true', help="Save the resulting plot")
+
+    args = ap.parse_args()
+
+    dirname = args.directory
+    bReprocess = args.reprocess
+    bPlotly = args.plotly
+    bSave = args.save
+
+    file_list = [file for file in os.listdir(dirname) if file.endswith('.avi')]
+    print("Files to process: " + str(file_list))
+
+    #Process the movies
+
+    #If the movies have been processed already, load from disk, otherwise, process
+    savepath = dirname+"/"+"ProcessedData"+".pkl"
+
+    if os.path.isfile(savepath) and not bReprocess:
+        df = pd.read_pickle(savepath)
+        print("Data loaded from disk")
+    else:
+        print("Did not find data, processing movies")
+        #Create a dataframe to hold the cropping boxes
+        columns = ['ExpName', 'CroppingBox']
+        df_crop = pd.DataFrame(columns=columns)
+        #Determine the bounding boxes
+        for file in file_list:
+            #Extract experiment name from filename
+            name = file.split('.')[0].split('/')[2]
+            #Open the file and get a stack of grayscale images
+            stack = open_video(file)
+            #Select the region of interest
+            df_crop = df_crop.append({'ExpName':name, 'CroppingBox':select_roi.select_rectangle(stack[len(stack)- 10])}, ignore_index=True)
+        #Run the movie analysis in parallel (one thread per movie)
+        df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, df_crop) for file in file_list)
+        #Merge all the dataframes in one and reindex
+        df = pd.concat(df_list).reset_index(drop=True)
+        #Save dataframe to disk
+        df.to_pickle(savepath)
+
+    if bPlotly:
+        plot_front_position_pltly(df, bSave, dirname)
+    else:
+        plot_front_position(df, bSave, dirname)
 
 

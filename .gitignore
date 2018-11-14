@@ -50,4 +50,6 @@ Temporary Items
 test_movies/
 test_images/
 
+# Temporary files and cache
 __pycache__/
+temp-plot.html
