@@ -118,9 +118,8 @@ def plot_front_position(df, bSave, dirname):
     """
 
     from matplotlib import pyplot as plt
-    from matplotlib.widgets import RectangleSelector
     
-    f1 = plt.figure()
+    plt.figure()
 
     # Use seaborn if available
     try:
@@ -142,14 +141,12 @@ def plot_front_position(df, bSave, dirname):
         ))
 
     plt.legend(fontsize=16,loc='lower right',frameon=True)
-    axes = plt.gca()
     plt.xlabel('Time (s)',fontsize=20)
     plt.ylabel('Height of Front (px)',fontsize=20)
 
     plt.minorticks_on()
     plt.tick_params(axis='both', which='major', labelsize=18)
 
-    f1.set_size_inches(8, 8)
     plt.show()
 
     if bSave:

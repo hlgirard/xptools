@@ -5,6 +5,8 @@ from skimage.segmentation import clear_border
 from skimage.measure import label, regionprops
 from skimage.morphology import closing, watershed, square
 
+import numpy as np
+
 def analyze_watershed(image):
     """Returns bright on dark particles using a watershed algorithm
 
@@ -33,7 +35,6 @@ def analyze_watershed(image):
     i_cleared = clear_border(i_closed)
     #Label image regions
     label_image = label(i_cleared)
-    image_label_overlay = label2rgb(label_image, image=i_grey)
     #Extract region properties
     partProps = regionprops(label_image, intensity_image=i_grey)
 
@@ -62,7 +63,6 @@ def analyze_minThreshold(image):
     i_cleared = clear_border(i_closed)
     #Label image regions
     label_image = label(i_cleared)
-    image_label_overlay = label2rgb(label_image, image=i_grey)
     #Extract region properties
     partProps = regionprops(label_image, intensity_image=i_grey)
 
