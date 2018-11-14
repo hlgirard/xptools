@@ -74,7 +74,7 @@ def obtain_cropping_boxes(file_list):
         df_crop = df_crop.append({'ExpName':name, 'CroppingBox':select_roi.select_rectangle(stack[len(stack)- 10])}, ignore_index=True)
     return df_crop
 
-def analyze_front(img, thresh, expName, stackIdx):
+def analyze_front(img, thresh, expName, stackIdx, scale):
     """Find the portion of the image with ice and determine the coordinates of the bounding box
     """
     #Threshold the image using the global threshold
@@ -90,11 +90,11 @@ def analyze_front(img, thresh, expName, stackIdx):
         #Get largest region properties
         minr, minc, maxr, maxc = largest.bbox
         area = largest.area
-        return [expName, stackIdx, area, minr, minc, maxr, maxc, area / img.shape[0]]
+        return [expName, stackIdx, area/scale**2, minr/scale, minc/scale, maxr/scale, maxc/scale, area / (img.shape[0] * scale)]
     else:
         return None
 
-def process_movie(file, df_crop):
+def process_movie(file, df_crop, scale):
     """Process a stack of images to determine the progress of the ice front.
     """
     #Extract experiment name from filename
@@ -112,7 +112,7 @@ def process_movie(file, df_crop):
     df = pd.DataFrame(columns=col_names)
     #Analyze pics and drop data in df
     for i in range(len(stack)):
-        result = analyze_front(stack[i], min_thresh, name, i)
+        result = analyze_front(stack[i], min_thresh, name, i, scale)
         if result != None:
             df.loc[i] = result
     #Return the dataframe
@@ -199,6 +199,7 @@ if __name__ == '__main__':
     ap.add_argument("-r", "--reprocess", action='store_true', help="Force the reprocessing of the movies")
     ap.add_argument("-p", "--plotly", action='store_true', help="Use plotly instead of matplotlib for graphing")
     ap.add_argument("-s", "--save", action='store_true', help="Save the resulting plot")
+    ap.add_argument("-c", "--scale", type=float, default=1, help="Scale factor in px/mm (default = 1)")
 
     #Retrieve arguments
     args = ap.parse_args()
@@ -207,6 +208,7 @@ if __name__ == '__main__':
     bReprocess = args.reprocess
     bPlotly = args.plotly
     bSave = args.save
+    scale = args.scale
 
     #Get a list of video files in the directory
     file_list = [dirname + '/' + file for file in os.listdir(dirname) if file.endswith('.avi')]
@@ -223,7 +225,7 @@ if __name__ == '__main__':
         print("Processing movies")
         df_crop = obtain_cropping_boxes(file_list)
         #Run the movie analysis in parallel (one thread per movie)
-        df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, df_crop) for file in file_list)
+        df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, df_crop, scale) for file in file_list)
         #Merge all the dataframes in one and reindex
         df = pd.concat(df_list).reset_index(drop=True)
         #Save dataframe to disk
