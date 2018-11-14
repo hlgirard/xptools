@@ -43,7 +43,6 @@ def open_video(file):
         stack.append(img_gray)
     return stack
 
-
 def determine_threshold(stack):
     """Determines the threshold to use for the stack.
 
@@ -53,6 +52,23 @@ def determine_threshold(stack):
     img = stack[len(stack)//2]
     return threshold_minimum(img)
 
+def obtain_cropping_boxes(file_list):
+    """Prompt the user to select the region of interest for each video file.
+
+    Returns a dataframe containing the file name (without extension) and the selected ROI coordinates.
+    """
+    #Create a dataframe to hold the cropping boxes
+    columns = ['ExpName', 'CroppingBox']
+    df_crop = pd.DataFrame(columns=columns)
+    #Determine the bounding boxes
+    for file in file_list:
+        #Extract experiment name from filename
+        name = file.split('.')[0].split('/')[-1]
+        #Open the file and get a stack of grayscale images
+        stack = open_video(file)
+        #Select the region of interest
+        df_crop = df_crop.append({'ExpName':name, 'CroppingBox':select_roi.select_rectangle(stack[len(stack)- 10])}, ignore_index=True)
+    return df_crop
 
 def analyze_front(img, thresh, expName, stackIdx):
     """Find the portion of the image with ice and determine the coordinates of the bounding box
@@ -75,7 +91,7 @@ def process_movie(file, df_crop):
     """Process a stack of images to determine the progress of the ice front.
     """
     #Extract experiment name from filename
-    name = file.split('.')[0].split('/')[2]
+    name = file.split('.')[0].split('/')[-1]
     #Open the file and get a stack of grayscale images
     stack = open_video(file)
     #Select the region of interest
@@ -94,7 +110,7 @@ def process_movie(file, df_crop):
     return df
 
 def plot_front_position(df, bSave, dirname):
-    """Plot the height vs. time of the freezing front
+    """Plot the height vs. time of the freezing front using matplotlib
     """
     f1 = plt.figure()
     sns.set()
@@ -126,6 +142,8 @@ def plot_front_position(df, bSave, dirname):
         plt.savefig(dirname + '/' + 'FrontHeight.pdf', bbox_inches = 'tight')
 
 def plot_front_position_pltly(df, bSave, dirname):
+    """Plot the height vs. time of the freezing front using plotly
+    """
     
     data=[]
 
@@ -156,12 +174,14 @@ def plot_front_position_pltly(df, bSave, dirname):
 
 if __name__ == '__main__':
 
+    #Setup parser
     ap = argparse.ArgumentParser()
     ap.add_argument("directory", help="Path of the directory")
     ap.add_argument("-r", "--reprocess", action='store_true', help="Force the reprocessing of the movies")
-    ap.add_argument("-p", "--plotly", action='store_true', help="Use plotly for graphing")
+    ap.add_argument("-p", "--plotly", action='store_true', help="Use plotly instead of matplotlib for graphing")
     ap.add_argument("-s", "--save", action='store_true', help="Save the resulting plot")
 
+    #Retrieve arguments
     args = ap.parse_args()
 
     dirname = args.directory
@@ -169,30 +189,20 @@ if __name__ == '__main__':
     bPlotly = args.plotly
     bSave = args.save
 
-    file_list = [file for file in os.listdir(dirname) if file.endswith('.avi')]
+    #Get a list of video files in the directory
+    file_list = [dirname + '/' + file for file in os.listdir(dirname) if file.endswith('.avi')]
     print("Files to process: " + str(file_list))
-
-    #Process the movies
-
-    #If the movies have been processed already, load from disk, otherwise, process
+    
+    #Save path for the processed dataframe
     savepath = dirname+"/"+"ProcessedData"+".pkl"
 
+    #If the movies have been processed already, load from disk, otherwise process now
     if os.path.isfile(savepath) and not bReprocess:
         df = pd.read_pickle(savepath)
         print("Data loaded from disk")
     else:
         print("Did not find data, processing movies")
-        #Create a dataframe to hold the cropping boxes
-        columns = ['ExpName', 'CroppingBox']
-        df_crop = pd.DataFrame(columns=columns)
-        #Determine the bounding boxes
-        for file in file_list:
-            #Extract experiment name from filename
-            name = file.split('.')[0].split('/')[2]
-            #Open the file and get a stack of grayscale images
-            stack = open_video(file)
-            #Select the region of interest
-            df_crop = df_crop.append({'ExpName':name, 'CroppingBox':select_roi.select_rectangle(stack[len(stack)- 10])}, ignore_index=True)
+        df_crop = obtain_cropping_boxes(file_list)
         #Run the movie analysis in parallel (one thread per movie)
         df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, df_crop) for file in file_list)
         #Merge all the dataframes in one and reindex
