@@ -85,11 +85,14 @@ def analyze_front(img, thresh, expName, stackIdx):
     label_image = label(bw)
     #Extract region properties for regions > 100 px^2
     regProp = [i for i in regionprops(label_image)]
-    largest = regProp[np.argmax([i.area for i in regProp])]
-    #Get largest region properties
-    minr, minc, maxr, maxc = largest.bbox
-    area = largest.area
-    return [expName, stackIdx, area, minr, minc, maxr, maxc, area / img.shape[0]]
+    if len(regProp) > 0:
+        largest = regProp[np.argmax([i.area for i in regProp])]
+        #Get largest region properties
+        minr, minc, maxr, maxc = largest.bbox
+        area = largest.area
+        return [expName, stackIdx, area, minr, minc, maxr, maxc, area / img.shape[0]]
+    else:
+        return None
 
 def process_movie(file, df_crop):
     """Process a stack of images to determine the progress of the ice front.
@@ -109,7 +112,9 @@ def process_movie(file, df_crop):
     df = pd.DataFrame(columns=col_names)
     #Analyze pics and drop data in df
     for i in range(len(stack)):
-        df.loc[i] = analyze_front(stack[i], min_thresh, name, i)
+        result = analyze_front(stack[i], min_thresh, name, i)
+        if result != None:
+            df.loc[i] = result
     #Return the dataframe
     return df
 
