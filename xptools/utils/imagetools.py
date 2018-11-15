@@ -1,36 +1,29 @@
-#!/usr/bin/env pythonw
-
-"""
-Displays the images contained in a directory as a grid (8 lines by default)
-
-Parameters
-----------
-lines : int
-    Number of lines of the image matrix
-directory : string
-    Path of the directory to be explored
-compress : boolean
-    Reduces the resolution of the resulting image to reduce filesize
-"""
-
+#System imports
 import os
 import sys
-import argparse
 
+#Image processing imports
 import itertools
 import cv2
 import numpy as np
 
-def list_files(dirname):
-    """Lists the image files in a directory
-
-    Returns a list of openCV image objects corresponding to all the *.JPG files
-    found in the directory
+def open_all_images(dirname):
+    """
+    Returns a list of all cv2 images found in the directory
+    
+    Parameters
+    ----------
+    dirname : string
+        Directory to look for the images in
+    Returns
+    ----------
+    list[cv2 images]
+        List of cv2 images
     """
     filename_list = []
 
     for file in os.listdir(dirname):
-        if file.endswith(".JPG"):
+        if file.endswith(".JPG") or file.endswith(".jpg"):
             filename_list.append(file)
 
     filename_list.sort()
@@ -39,15 +32,23 @@ def list_files(dirname):
 
     return [cv2.imread(dirname+"/"+file) for file in filename_list]
 
-def compose_matrix(imgs, dirname, lines, compress):
-    """Arranges the images from a list in a matrix
-
-    The images are arranged in a grid and the resulting matrix is saved
+def compose_matrix(imgs, dirname, lines = 8, bCompress = False):
+    """
+    Arranges images in a matrix and saves the resulting image to the chosen directory
+    
+    Parameters
+    ----------
+    imgs : list (cv2 images)
+        List of image to process
+    dirname : string
+        Path of the directory to save the composition to
+    lines : int, optional
+        Number of lines in the matrix (default 8)
+    bCompress : boolean, optional
+        Flag to downscale the resulting composition to 1/10th of the original resultion
     """
 
-    expname = dirname.split('/')[-1]
-
-    name = "Crystallization_" + expname + "_per_particle" + ".jpg" #Name of the exported file
+    name = dirname.split('/')[-1] + ".jpg" #Name of the exported file
     margin = 20 #Margin between pictures in pixels
 
     n = len(imgs) # Number of images in the list
@@ -83,25 +84,10 @@ def compose_matrix(imgs, dirname, lines, compress):
     print("Writing the composite image to {0}".format(dirname + '/' + name))
 
     #Write the final image to disc and compress if requested
-    if compress:
+    if bCompress:
         resized = cv2.resize(imgmatrix, (mat_x//3,mat_y//3), interpolation = cv2.INTER_AREA)
         compression_params = [cv2.IMWRITE_JPEG_QUALITY, 90]
         cv2.imwrite(dirname + '/' + name, resized, compression_params)
     else:
         compression_params = [cv2.IMWRITE_JPEG_QUALITY, 100]
         cv2.imwrite(dirname + '/' + name, imgmatrix, compression_params)
-
-
-if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-l", "--lines", type=int , required=False, default=8, help="Number of lines of the image matrix")
-    ap.add_argument("directory", help="Path of the directory")
-    ap.add_argument("-c", "--compress", action='store_true', help="Resizes the finale image to reduce resolution by a factor of 9")
-
-    args = ap.parse_args()
-
-    dirname = args.directory
-    lines = args.lines
-    compress = args.compress
-
-    compose_matrix(list_files(dirname), dirname, lines, compress)

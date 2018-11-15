@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+
+"""
+Displays the images contained in a directory as a grid (8 lines by default)
+"""
+
+import argparse
+import os
+
+from xptools.utils import imagetools
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("directory", nargs='?', default=os.getcwd(), help="Path of the directory")
+    ap.add_argument("-l", "--lines", type=int , required=False, default=8, help="Number of lines of the image matrix (default 8)")
+    ap.add_argument("-c", "--compress", action='store_true', help="Resizes the finale image to reduce resolution by a factor of 9")
+
+    args = ap.parse_args()
+
+    dirname = args.directory
+    lines = args.lines
+    compress = args.compress
+
+    imagetools.compose_matrix(imagetools.open_all_images(dirname), dirname, lines, compress)
