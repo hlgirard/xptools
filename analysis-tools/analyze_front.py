@@ -71,10 +71,13 @@ def obtain_cropping_boxes(file_list):
         #Open the file and get a stack of grayscale images
         stack = open_video(file)
         #Select the region of interest
-        df_crop = df_crop.append({'ExpName':name, 'CroppingBox':select_roi.select_rectangle(stack[len(stack)- 10])}, ignore_index=True)
+        rectangle = None
+        while rectangle == None:
+            rectangle = select_roi.select_rectangle(stack[len(stack)- 10])
+        df_crop = df_crop.append({'ExpName':name, 'CroppingBox':rectangle}, ignore_index=True)
     return df_crop
 
-def analyze_front(img, thresh, expName, stackIdx):
+def analyze_front(img, thresh, expName, stackIdx, scale, framerate, bAuto):
     """Find the portion of the image with ice and determine the coordinates of the bounding box
     """
     #Threshold the image using the global threshold
@@ -83,18 +86,23 @@ def analyze_front(img, thresh, expName, stackIdx):
     bw = closing(img_min_thresh, square(3))
     # label image regions
     label_image = label(bw)
-    #Extract region properties for regions > 100 px^2
-    regProp = [i for i in regionprops(label_image)]
+    #Extract region properties
+    regProp = [i for i in regionprops(label_image, intensity_image=img)]
     if len(regProp) > 0:
         largest = regProp[np.argmax([i.area for i in regProp])]
-        #Get largest region properties
-        minr, minc, maxr, maxc = largest.bbox
-        area = largest.area
-        return [expName, stackIdx, area, minr, minc, maxr, maxc, area / img.shape[0]]
+        #Low mean intensity likely means there is no ice yet
+        minIntensity = 240 if bAuto else 0
+        if largest.mean_intensity > minIntensity:
+            #Get largest region properties
+            minr, minc, maxr, maxc = largest.bbox
+            area = largest.area
+            return [expName, stackIdx, stackIdx/framerate, area/scale**2, minr/scale, minc/scale, maxr/scale, maxc/scale, area / (img.shape[0] * scale)]
+        else:
+            return None
     else:
         return None
 
-def process_movie(file, df_crop):
+def process_movie(file, df_crop, scale, framerate, bAuto):
     """Process a stack of images to determine the progress of the ice front.
     """
     #Extract experiment name from filename
@@ -108,13 +116,16 @@ def process_movie(file, df_crop):
     #Determine the threshold
     min_thresh = determine_threshold(stack_cropped)
     #Create a dataframe to hold the data
-    col_names = ['ExpName','Frame #', 'Area', 'MinRow', 'MinCol', 'MaxRow', 'MaxCol','HeightPx']
+    col_names = ['ExpName','Frame #', 'Time', 'Area', 'MinRow', 'MinCol', 'MaxRow', 'MaxCol','HeightPx']
     df = pd.DataFrame(columns=col_names)
     #Analyze pics and drop data in df
     for i in range(len(stack)):
-        result = analyze_front(stack[i], min_thresh, name, i)
+        result = analyze_front(stack[i], min_thresh, name, i, scale, framerate, bAuto)
         if result != None:
             df.loc[i] = result
+    #Slide the time back to the first frame where ice is detected (if autoprocess is requested)
+    if bAuto:
+        df['Time'] = df['Time'] - min(df['Time'])
     #Return the dataframe
     return df
 
@@ -140,14 +151,14 @@ def plot_front_position(df, bSave, dirname):
 
     for i in range(len(df['ExpName'].unique())):
         p.append(plt.scatter(
-            df[df['ExpName'] == df['ExpName'].unique()[i]]['Frame #'],
+            df[df['ExpName'] == df['ExpName'].unique()[i]]['Time'],
             df[df['ExpName'] == df['ExpName'].unique()[i]]['HeightPx'],
             label = df['ExpName'].unique()[i]
         ))
 
     plt.legend(fontsize=16,loc='lower right',frameon=True)
     plt.xlabel('Time (s)',fontsize=20)
-    plt.ylabel('Height of Front (px)',fontsize=20)
+    plt.ylabel('Height of Front (mm)',fontsize=20)
 
     plt.minorticks_on()
     plt.tick_params(axis='both', which='major', labelsize=18)
@@ -169,7 +180,7 @@ def plot_front_position_pltly(df, bSave, dirname):
 
     for i in range(len(df['ExpName'].unique())):
         data.append(go.Scatter(
-            x = df[df['ExpName'] == df['ExpName'].unique()[i]]['Frame #'],
+            x = df[df['ExpName'] == df['ExpName'].unique()[i]]['Time'],
             y = df[df['ExpName'] == df['ExpName'].unique()[i]]['HeightPx'],
             name = df['ExpName'].unique()[i]
         ))
@@ -180,7 +191,7 @@ def plot_front_position_pltly(df, bSave, dirname):
             width = 800,
             height = 500,
             xaxis=dict(title='Time (s)', linecolor = 'black',linewidth = 2, mirror = True),
-            yaxis=dict(title='Height of front (px)',linecolor = 'black',linewidth = 2, mirror = True),
+            yaxis=dict(title='Height of front (mm)',linecolor = 'black',linewidth = 2, mirror = True),
             showlegend=True
         )}
     )
@@ -199,6 +210,9 @@ if __name__ == '__main__':
     ap.add_argument("-r", "--reprocess", action='store_true', help="Force the reprocessing of the movies")
     ap.add_argument("-p", "--plotly", action='store_true', help="Use plotly instead of matplotlib for graphing")
     ap.add_argument("-s", "--save", action='store_true', help="Save the resulting plot")
+    ap.add_argument("-c", "--scale", type=float, default=1, help="Scale factor in px/mm (default = 1)")
+    ap.add_argument("-f", "--framerate", type=int, default=1, help="Frame rate (default = 1)")
+    ap.add_argument("-a", "--autoprocess", action='store_true', help="Attempt to detect when the ice first appears")
 
     #Retrieve arguments
     args = ap.parse_args()
@@ -207,6 +221,9 @@ if __name__ == '__main__':
     bReprocess = args.reprocess
     bPlotly = args.plotly
     bSave = args.save
+    scale = args.scale
+    framerate = args.framerate
+    bAuto = args.autoprocess
 
     #Get a list of video files in the directory
     file_list = [dirname + '/' + file for file in os.listdir(dirname) if file.endswith('.avi')]
@@ -223,7 +240,7 @@ if __name__ == '__main__':
         print("Processing movies")
         df_crop = obtain_cropping_boxes(file_list)
         #Run the movie analysis in parallel (one thread per movie)
-        df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, df_crop) for file in file_list)
+        df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, df_crop, scale, framerate, bAuto) for file in file_list)
         #Merge all the dataframes in one and reindex
         df = pd.concat(df_list).reset_index(drop=True)
         #Save dataframe to disk
