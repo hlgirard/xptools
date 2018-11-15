@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env pythonw
 
 """
 Displays the images contained in a directory as a grid (8 lines by default)
@@ -33,7 +33,7 @@ def list_files(dirname):
         if file.endswith(".JPG"):
             filename_list.append(file)
 
-    filename_list.sort();
+    filename_list.sort()
 
     print("Found {0} files in the directory".format(len(filename_list)))
 
