@@ -228,9 +228,6 @@ if __name__ == '__main__':
     else:
         raise ValueError('Invalid file or directory.')
 
-    #Get a list of video files in the directory
-    
-
     if len(file_list) == 0:
         raise Exception('No video file in directory.')
 
