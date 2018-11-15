@@ -1,3 +1,5 @@
+import matplotlib as mpl
+mpl.use('TkAgg')
 from matplotlib.widgets import RectangleSelector
 from matplotlib import pyplot as plt
 

@@ -202,7 +202,7 @@ if __name__ == '__main__':
 
     #Setup parser
     ap = argparse.ArgumentParser()
-    ap.add_argument("directory", help="Path of the directory")
+    ap.add_argument("directory", nargs='?', default=os.getcwd(), help="Path of the directory")
     ap.add_argument("-r", "--reprocess", action='store_true', help="Force the reprocessing of the movies")
     ap.add_argument("-p", "--plotly", action='store_true', help="Use plotly instead of matplotlib for graphing")
     ap.add_argument("-s", "--save", action='store_true', help="Save the resulting plot")
@@ -223,6 +223,10 @@ if __name__ == '__main__':
 
     #Get a list of video files in the directory
     file_list = [dirname + '/' + file for file in os.listdir(dirname) if file.endswith('.avi')]
+
+    if len(file_list) == 0:
+        raise Exception('No video file in directory.')
+
     print("Files to process: " + str(file_list))
     
     #Save path for the processed dataframe
