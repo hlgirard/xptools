@@ -6,9 +6,9 @@ Analysis tools for experimental sciences to display images, detect particles (ce
 
 Install from pip with the command
 
-'''
+```
 pip install xptools
-'''
+```
 
 ## Scripts
 
@@ -16,15 +16,17 @@ pip install xptools
 and processes the selected area with a minimum threshold to find the largest area. It then plots the height of this area as
 a function of time.
 
-'''
+```
 analyze_front --plotly --scale 60 --framerate 30 moviedirectory/
-'''
+```
+
+![screenshot](docs/screenshots/analyze_front_ex-01.jpg)
 
 - display_image_matrix - Arranges all the images in a directory as a matrix and saves the resulting image
 
-'''
+```
 display_image_matrix --lines 10 --compress imagedirectory/
-'''
+```
 
 ## Utilities
 
@@ -42,7 +44,7 @@ Several utilities are included in the submodule utils including:
 
 ### Example usage
 
-'''python
+```python
 import pandas as pd
 from xptools.utils import videotools
 
@@ -52,14 +54,16 @@ g_crop = df_crop.groupby('ExpName')
 for name in g_crop.groups.keys():
     (minRow, minCol, maxRow, maxCol) = g_crop.get_group[name]['CroppingBox']
     stack = [img[minRow:maxRow,minCol:maxCol] for img in stack]
-'''
+```
 
 ## Notebooks
 
-- BroadSpectrumTesting.ipynb: Tests different image analysis techniques to determine which is most appropriate
-- FocusedAnalysis.ipynb: Implements a specific analysis and plots the resulting size and number distributions for the particles
+- BroadSpectrumTesting.ipynb - Tests different image analysis techniques to determine which is most appropriate
+- FocusedAnalysis.ipynb - Implements a specific analysis and plots the resulting size and number distributions for the particles
 
 ## Credits
+
+Code for display_image_matrix adapted from https://gist.github.com/pgorczak/95230f53d3f140e4939c#file-imgmatrix-py
 
 ## License
 
