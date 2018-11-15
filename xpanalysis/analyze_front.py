@@ -18,7 +18,6 @@ import numpy as np
 import pandas as pd
 
 # Image analysis
-import cv2
 import skimage
 from skimage import io
 from skimage.measure import label, regionprops
@@ -29,8 +28,8 @@ import os
 import argparse
 from joblib import Parallel, delayed
 
-# Local imports
-from utils import select_roi, videotools
+# Local packages
+from xpanalysis.utils import select_roi, videotools
 
 def analyze_front(img, thresh, scale = 1, bAuto = False):
     """

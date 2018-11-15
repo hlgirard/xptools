@@ -65,7 +65,7 @@ def obtain_cropping_boxes(file_list):
         CroppingBox (tuple (int)): rectangle coordinates following the numpy array convention (minRow, minCol, maxRow, maxCol).
     """
     #Imports
-    from utils import select_roi
+    from xpanalysis.utils import select_roi
     #Create a dataframe to hold the cropping boxes
     columns = ['ExpName', 'CroppingBox']
     df_crop = pd.DataFrame(columns=columns)

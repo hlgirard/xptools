@@ -1,11 +1,6 @@
 from matplotlib.widgets import RectangleSelector
 from matplotlib import pyplot as plt
 
-#Testing imports
-from skimage import io, exposure, img_as_float, img_as_ubyte, morphology, filters, util
-from skimage.color import rgb2gray, label2rgb
-
-
 class RectangleSelection(object):
     def __init__(self, img):
         self.rectangle = None
