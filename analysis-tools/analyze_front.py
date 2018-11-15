@@ -8,6 +8,9 @@ Options
 -r: force reprocessing of the videos
 -p: use plotly instead of matplotlib for plotting
 -s: save the output graph
+-c: scale factor in px/mm
+-f: framerate in frames/s
+-a: (experimental) autodetect beginning of the ice progression
 """
 
 # Data analysis
@@ -15,12 +18,9 @@ import numpy as np
 import pandas as pd
 
 # Image analysis
-import av
 import cv2
 import skimage
-from skimage import io, img_as_ubyte
-from skimage.color import rgb2gray
-from skimage.filters import threshold_minimum
+from skimage import io
 from skimage.measure import label, regionprops
 from skimage.morphology import closing, square
 
@@ -30,55 +30,26 @@ import argparse
 from joblib import Parallel, delayed
 
 # Local imports
-import select_roi
+from utils import select_roi, videotools
 
-def open_video(file):
-    """Opens a video file and returns a stack of numpy arrays corresponding to each frame.
+def analyze_front(img, thresh, scale = 1, bAuto = False):
+    """
+    Process a frame to determine the position of a moving front
     
-    The images in the stack are converted to ubyte and gray scale for further processing.
-    """
-
-    v = av.open(file)
-    stack = []
-    for frame in v.decode(video=0):
-        img = frame.to_image()
-        #Convert the img to a numpy array, convert to grayscale and ubyte.
-        img_gray = img_as_ubyte(rgb2gray(np.asarray(img)))
-        stack.append(img_gray)
-    return stack
-
-def determine_threshold(stack):
-    """Determines the threshold to use for the stack.
-
-    Returns the value obtained by running a minimum threshold algorithm on the median image of the stack.
-    TODO: increase robustness by comparing thresholds obtained on different images and choosing the best one.
-    """
-    img = stack[len(stack)//2]
-    return threshold_minimum(img)
-
-def obtain_cropping_boxes(file_list):
-    """Prompt the user to select the region of interest for each video file.
-
-    Returns a dataframe containing the file name (without extension) and the selected ROI coordinates.
-    """
-    #Create a dataframe to hold the cropping boxes
-    columns = ['ExpName', 'CroppingBox']
-    df_crop = pd.DataFrame(columns=columns)
-    #Determine the bounding boxes
-    for file in file_list:
-        #Extract experiment name from filename
-        name = file.split('.')[0].split('/')[-1]
-        #Open the file and get a stack of grayscale images
-        stack = open_video(file)
-        #Select the region of interest
-        rectangle = None
-        while rectangle == None:
-            rectangle = select_roi.select_rectangle(stack[len(stack)- 10])
-        df_crop = df_crop.append({'ExpName':name, 'CroppingBox':rectangle}, ignore_index=True)
-    return df_crop
-
-def analyze_front(img, thresh, expName, stackIdx, scale, framerate, bAuto):
-    """Find the portion of the image with ice and determine the coordinates of the bounding box
+    Parameters
+    ----------
+    img : np.array
+        image to process (must be gray scale, ubyte)
+    thresh : int
+        Intensity threshold to use
+    scale : float, optional
+        Scaling factor in px/mm. Default is 1 px/mm
+    bAuto : boolean, optional
+        Try to determine the beginning of the front progression automatically (experimental). Default is False
+    Returns
+    -------
+    List (float) [Area, MinRow, MinCol, MaxRow, MaxCol, Height]
+        Information and coordinates of the largest detected region. All values in mm, use scale = 1 to obtain pixels
     """
     #Threshold the image using the global threshold
     img_min_thresh = img > thresh
@@ -96,33 +67,59 @@ def analyze_front(img, thresh, expName, stackIdx, scale, framerate, bAuto):
             #Get largest region properties
             minr, minc, maxr, maxc = largest.bbox
             area = largest.area
-            return [expName, stackIdx, stackIdx/framerate, area/scale**2, minr/scale, minc/scale, maxr/scale, maxc/scale, area / (img.shape[0] * scale)]
+            return [area/scale**2, minr/scale, minc/scale, maxr/scale, maxc/scale, area / (img.shape[0] * scale)]
         else:
             return None
     else:
         return None
 
-def process_movie(file, df_crop, scale, framerate, bAuto):
-    """Process a stack of images to determine the progress of the ice front.
+def process_movie(file, crop_box = None, scale = 1, framerate = 1, bAuto = False):
+    """
+    Process a video to determine the progression of a moving front.
+    
+    Parameters
+    ----------
+    file : string
+        path of the video file to open
+    crop_box : tuple (int), optional
+        Coordinates of the cropping box in the format (minRow, minCol, maxRow, maxCol) based on numpy coordinates
+    scale : float, optional
+        Scaling factor in px/mm. Default is 1 px/mm
+    framerate : int, optional
+        Framerate of the video. Default is 1 frame / s
+    bAuto : boolean, optional
+        Try to determine the beginning of the front progression automatically (experimental). Default is False
+    Returns
+    -------
+    Dataframe {'ExpName','Frame #', 'Time', 'Area', 'MinRow', 'MinCol', 'MaxRow', 'MaxCol','Height'}
+        A dataframe containing the results of the analysis
+        ExpName: string - Name of the file without the extension
+        Frame #: int - Frame number
+        Time: float - Time since start of the video (or icing event if bAuto = True)
+        Area: float - Area of the detected region
+        MinRow, MinCol, MaxRow, MaxCol: int - Coordinates of the bounding box of the detected region
+        Height: float - Height of the region calculated with area / (img.shape[0] * scale
     """
     #Extract experiment name from filename
     name = file.split('.')[0].split('/')[-1]
     #Open the file and get a stack of grayscale images
-    stack = open_video(file)
-    #Select the region of interest
-    (minRow, minCol, maxRow, maxCol) = df_crop[df_crop['ExpName'] == name]['CroppingBox'].iloc[0]
-    #Crop the stack to the right dimensions
-    stack_cropped = [img[minRow:maxRow,minCol:maxCol] for img in stack]
+    stack = videotools.open_video(file)
+    if crop_box != None:
+        #Select the region of interest
+        (minRow, minCol, maxRow, maxCol) = crop_box
+        #Crop the stack to the right dimensions
+        stack = [img[minRow:maxRow,minCol:maxCol] for img in stack]
     #Determine the threshold
-    min_thresh = determine_threshold(stack_cropped)
+    min_thresh = videotools.determine_threshold(stack)
     #Create a dataframe to hold the data
-    col_names = ['ExpName','Frame #', 'Time', 'Area', 'MinRow', 'MinCol', 'MaxRow', 'MaxCol','HeightPx']
+    col_names = ['ExpName','Frame #', 'Time', 'Area', 'MinRow', 'MinCol', 'MaxRow', 'MaxCol','Height']
     df = pd.DataFrame(columns=col_names)
-    #Analyze pics and drop data in df
+    #Analyze pics and drop data in dataframe
     for i in range(len(stack)):
-        result = analyze_front(stack[i], min_thresh, name, i, scale, framerate, bAuto)
+        result = analyze_front(stack[i], min_thresh, scale, bAuto)
         if result != None:
-            df.loc[i] = result
+            all_fields = [name, i, i/framerate] + result
+            df.loc[i] = all_fields
     #Slide the time back to the first frame where ice is detected (if autoprocess is requested)
     if bAuto:
         df['Time'] = df['Time'] - min(df['Time'])
@@ -152,7 +149,7 @@ def plot_front_position(df, bSave, dirname):
     for i in range(len(df['ExpName'].unique())):
         p.append(plt.scatter(
             df[df['ExpName'] == df['ExpName'].unique()[i]]['Time'],
-            df[df['ExpName'] == df['ExpName'].unique()[i]]['HeightPx'],
+            df[df['ExpName'] == df['ExpName'].unique()[i]]['Height'],
             label = df['ExpName'].unique()[i]
         ))
 
@@ -181,7 +178,7 @@ def plot_front_position_pltly(df, bSave, dirname):
     for i in range(len(df['ExpName'].unique())):
         data.append(go.Scatter(
             x = df[df['ExpName'] == df['ExpName'].unique()[i]]['Time'],
-            y = df[df['ExpName'] == df['ExpName'].unique()[i]]['HeightPx'],
+            y = df[df['ExpName'] == df['ExpName'].unique()[i]]['Height'],
             name = df['ExpName'].unique()[i]
         ))
 
@@ -238,9 +235,15 @@ if __name__ == '__main__':
         print("Data loaded from disk")
     else:
         print("Processing movies")
-        df_crop = obtain_cropping_boxes(file_list)
+        df_crop = videotools.obtain_cropping_boxes(file_list)
+        #Make a list with file names and cropping boxes
+        vid_list = []
+        for file in file_list:
+            name = file.split('.')[0].split('/')[-1]
+            cropping_box = df_crop[df_crop['ExpName'] == name]['CroppingBox'].iloc[0]
+            vid_list.append((file, cropping_box))
         #Run the movie analysis in parallel (one thread per movie)
-        df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, df_crop, scale, framerate, bAuto) for file in file_list)
+        df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, box, scale, framerate, bAuto) for (file, box) in vid_list)
         #Merge all the dataframes in one and reindex
         df = pd.concat(df_list).reset_index(drop=True)
         #Save dataframe to disk

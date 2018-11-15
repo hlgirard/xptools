@@ -40,12 +40,20 @@ class RectangleSelection(object):
             self.RS.set_active(True)
 
 
-
 def select_rectangle(img):
-    ''' Create a window requesting a rectangular selection on the passed image
+    """
+    Prompts the user to make a rectangular selection on the passed image
 
-    Supports multiple redos, press q to exit
-    '''
+    Parameters
+    ----------
+    img : np.array
+        image to process
+
+    Returns
+    -------
+    tuple 
+        Rectangle coordinates following the numpy array convention (minRow, minCol, maxRow, maxCol)
+    """
 
     selector = RectangleSelection(img)
 
@@ -56,11 +64,19 @@ def select_rectangle(img):
     return selector.rectangle
 
 def select_multi_rectangle(img_list):
-    ''' Returns a list containing the coordinates of the selected rectangle for each image
+    """
+    Returns a list containing the coordinates of the selected rectangle for each image
 
-    List of tuple of int, coordinates of the selected rectangle (minRow, minCol, maxRow, maxCol)
-    List has the same order as the incoming list
-    '''
+    Parameters
+    ----------
+    file_list : List (np.array)
+        list of images to process
+
+    Returns
+    -------
+    List 
+        List of the rectangle coordinates following the numpy array convention (minRow, minCol, maxRow, maxCol).
+    """
 
     #Create list to hold the coordinates
     rectangles = []
@@ -70,8 +86,3 @@ def select_multi_rectangle(img_list):
         rectangles.append(select_rectangle(img))
     
     return rectangles
-
-
-if __name__ == '__main__':
-    test_img = img_as_ubyte(rgb2gray(io.imread('analysis-tools/test_movies/test_image.jpg')))
-    print('Coordinates of the selected rectangle: ' + str(select_rectangle(test_img)))
