@@ -221,8 +221,15 @@ if __name__ == '__main__':
     framerate = args.framerate
     bAuto = args.autoprocess
 
+    if os.path.isfile(dirname) and dirname.endswith('.avi'):
+        file_list=dirname
+    elif os.path.isdir(dirname):
+        file_list = [dirname + '/' + file for file in os.listdir(dirname) if file.endswith('.avi')]
+    else:
+        raise ValueError('Invalid file or directory.')
+
     #Get a list of video files in the directory
-    file_list = [dirname + '/' + file for file in os.listdir(dirname) if file.endswith('.avi')]
+    
 
     if len(file_list) == 0:
         raise Exception('No video file in directory.')
