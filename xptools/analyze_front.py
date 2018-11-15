@@ -29,7 +29,7 @@ import argparse
 from joblib import Parallel, delayed
 
 # Local packages
-from xpanalysis.utils import select_roi, videotools
+from xptools.utils import select_roi, videotools
 
 def analyze_front(img, thresh, scale = 1, bAuto = False):
     """
