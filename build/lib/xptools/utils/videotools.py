@@ -7,7 +7,7 @@ from skimage.filters import threshold_minimum
 
 def open_video(file):
     """
-    Opens a video file and returns a stack of numpy arrays corresponding to each frame.
+    Opens a video file and returns a list of numpy arrays corresponding to each frame.
     The images in the stack are converted to ubyte and gray scale for further processing.
     
     Parameters
