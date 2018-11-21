@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from skimage import img_as_ubyte, exposure
+from skimage import io, img_as_ubyte, exposure
 from skimage.color import rgb2gray
 from skimage.feature import peak_local_max
 from skimage.filters import threshold_otsu
@@ -10,6 +10,13 @@ from skimage.measure import label, regionprops
 from skimage.morphology import closing
 
 from scipy import ndimage as ndi
+
+from xptools.utils import imagetools
+
+import os
+import argparse
+
+import matplotlib.pyplot as plt
 
 
 def analyze_bubbles(img, scale = 1, frame = 0):
@@ -50,7 +57,7 @@ def analyze_bubbles(img, scale = 1, frame = 0):
     #Run a watershed algorithm to separate the bubbles
     img_segmented = watershed(-dist_cont, markers, mask = img_closed, watershed_line=True)
     #Label the segmented image
-    img_labeled = ndi.label(img_segmented)
+    img_labeled, num_sec = ndi.label(img_segmented)
     #Get the properties of the labeled regions and construct a dataframe
     reg = regionprops(img_labeled, coordinates='rc')
     columns= ['Frame','Label', 'Area', 'Eccentricity', 'Bbox Area']
@@ -89,3 +96,62 @@ def plot_buble_area_hist(df, bSave = False, dirname = None):
 
     if bSave:
         pio.write_image(fig, dirname + '/' + 'FrontHeight.pdf')
+
+def main():
+    #Setup parser
+    ap = argparse.ArgumentParser()
+    ap.add_argument("directory", nargs='?', default=os.getcwd(), help="Path of the directory")
+    ap.add_argument("-r", "--reprocess", action='store_true', help="Force the reprocessing of the images")
+    ap.add_argument("-p", "--plotly", action='store_true', help="Use plotly instead of matplotlib for graphing")
+    ap.add_argument("-s", "--save", action='store_true', help="Save the resulting plot")
+    ap.add_argument("-c", "--scale", type=float, default=1, help="Scale factor in px/mm (default = 1)")
+
+    #Retrieve arguments
+    args = ap.parse_args()
+
+    dirname = args.directory
+    bReprocess = args.reprocess
+    bPlotly = args.plotly
+    bSave = args.save
+    scale = args.scale
+
+    # File or directory?
+    isFile = False
+
+    if os.path.isfile(dirname) and dirname.endswith('.png'):
+        file_list=[os.path.abspath(dirname)]
+        isFile = True
+    elif os.path.isdir(dirname):
+        file_list = [dirname + '/' + file for file in os.listdir(dirname) if file.endswith('.png')]
+    else:
+        raise ValueError('Invalid file or directory.')
+
+    if len(file_list) == 0:
+        raise Exception('No video file in directory.')
+
+    print("Files to process: " + str(file_list))
+    
+    #Save path for the processed dataframe
+    if isFile:
+        savedir = os.path.abspath(os.path.dirname(dirname))
+        filename = dirname.split('.')[0].split('/')[-1]
+        savepath = savedir+"/"+"ProcessedData_"+filename+".pkl"
+    else:
+        savepath = dirname+"/"+"ProcessedData"+".pkl"
+
+    #Obtain cropping boxes
+    df_crop = imagetools.obtain_cropping_boxes(file_list)
+
+    #Process all files
+    for file in file_list:
+        name = file.split('.')[0].split('/')[-1]
+        (minRow, minCol, maxRow, maxCol) = df_crop[df_crop['ExpName'] == name]['CroppingBox'].iloc[0]
+        img = io.imread(file)
+        img_cropped = img[minRow:maxRow,minCol:maxCol]
+        df = analyze_bubbles(img_cropped, scale, 0)
+        plot_buble_area_hist(df, bSave, savepath)
+
+
+
+if __name__ == '__main__':
+    main()

@@ -32,6 +32,41 @@ def open_all_images(dirname):
 
     return [cv2.imread(dirname+"/"+file) for file in filename_list]
 
+def obtain_cropping_boxes(file_list):
+    """Prompts the user to select the region of interest for each image file.
+
+    Parameters
+    ----------
+    file_list : list (str)
+        list of path of the image files to process
+
+    Returns
+    -------
+    Dataframe {'ExpName', 'CroppingBox'}
+        A dataframe containing the selected region for each file.
+        ExpName (str): name of the file without the extension
+        CroppingBox (tuple (int)): rectangle coordinates following the numpy array convention (minRow, minCol, maxRow, maxCol).
+    """
+    #Imports
+    from xptools.utils import select_roi
+    from skimage import io
+    import pandas as pd
+    #Create a dataframe to hold the cropping boxes
+    columns = ['ExpName', 'CroppingBox']
+    df_crop = pd.DataFrame(columns=columns)
+    #Determine the bounding boxes
+    for file in file_list:
+        #Extract experiment name from filename
+        name = file.split('.')[0].split('/')[-1]
+        #Open the file and get a stack of grayscale images
+        img = io.imread(file)
+        #Select the region of interest
+        rectangle = None
+        while rectangle == None:
+            rectangle = select_roi.select_rectangle(img)
+        df_crop = df_crop.append({'ExpName':name, 'CroppingBox':rectangle}, ignore_index=True)
+    return df_crop
+
 def compose_matrix(imgs, dirname, lines = 8, bCompress = False):
     """
     Arranges images in a matrix and saves the resulting image to the chosen directory

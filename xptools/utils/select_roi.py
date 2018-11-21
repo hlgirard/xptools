@@ -52,9 +52,9 @@ def select_rectangle(img):
         Rectangle coordinates following the numpy array convention (minRow, minCol, maxRow, maxCol)
     """
 
-    selector = RectangleSelection(img)
-
     print('Select the region of interest then press Q/q to confirm selection and exit.')
+
+    selector = RectangleSelection(img)
 
     plt.close(selector.fig)
 
