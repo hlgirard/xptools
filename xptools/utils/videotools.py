@@ -1,6 +1,5 @@
 import av
 import numpy as np
-import pandas as pd
 from skimage import img_as_ubyte
 from skimage.color import rgb2gray
 from skimage.filters import threshold_minimum
@@ -59,16 +58,15 @@ def obtain_cropping_boxes(file_list):
 
     Returns
     -------
-    Dataframe {'ExpName', 'CroppingBox'}
-        A dataframe containing the selected region for each file.
-        ExpName (str): name of the file without the extension
+    Dictionary {'Name', 'CroppingBox'}
+        A dictionary containing the selected region for each file.
+        Name (str): name of the file without the extension
         CroppingBox (tuple (int)): rectangle coordinates following the numpy array convention (minRow, minCol, maxRow, maxCol).
     """
     #Imports
     from xptools.utils import select_roi
-    #Create a dataframe to hold the cropping boxes
-    columns = ['ExpName', 'CroppingBox']
-    df_crop = pd.DataFrame(columns=columns)
+    #Create a dictionary to hold the cropping boxes
+    dict_crop = {}
     #Determine the bounding boxes
     for file in file_list:
         #Extract experiment name from filename
@@ -79,5 +77,5 @@ def obtain_cropping_boxes(file_list):
         rectangle = None
         while rectangle == None:
             rectangle = select_roi.select_rectangle(stack[len(stack)- 10])
-        df_crop = df_crop.append({'ExpName':name, 'CroppingBox':rectangle}, ignore_index=True)
-    return df_crop
+        dict_crop[name]=rectangle
+    return dict_crop

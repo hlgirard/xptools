@@ -140,12 +140,12 @@ def main():
         savepath = dirname+"/"+"ProcessedData"+".pkl"
 
     #Obtain cropping boxes
-    df_crop = imagetools.obtain_cropping_boxes(file_list)
+    dict_crop = imagetools.obtain_cropping_boxes(file_list)
 
     #Process all files
     for file in file_list:
         name = file.split('.')[0].split('/')[-1]
-        (minRow, minCol, maxRow, maxCol) = df_crop[df_crop['ExpName'] == name]['CroppingBox'].iloc[0]
+        (minRow, minCol, maxRow, maxCol) = dict_crop[name]
         img = io.imread(file)
         img_cropped = img[minRow:maxRow,minCol:maxCol]
         df = analyze_bubbles(img_cropped, scale, 0)

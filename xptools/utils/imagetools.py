@@ -42,18 +42,16 @@ def obtain_cropping_boxes(file_list):
 
     Returns
     -------
-    Dataframe {'ExpName', 'CroppingBox'}
-        A dataframe containing the selected region for each file.
-        ExpName (str): name of the file without the extension
+    Dictionary {'Name': 'CroppingBox'}
+        A dictionary containing the selected region for each file.
+        Name (str): name of the file without the extension
         CroppingBox (tuple (int)): rectangle coordinates following the numpy array convention (minRow, minCol, maxRow, maxCol).
     """
     #Imports
     from xptools.utils import select_roi
     from skimage import io
-    import pandas as pd
-    #Create a dataframe to hold the cropping boxes
-    columns = ['ExpName', 'CroppingBox']
-    df_crop = pd.DataFrame(columns=columns)
+
+    crop_dict = {}
     #Determine the bounding boxes
     for file in file_list:
         #Extract experiment name from filename
@@ -64,8 +62,8 @@ def obtain_cropping_boxes(file_list):
         rectangle = None
         while rectangle == None:
             rectangle = select_roi.select_rectangle(img)
-        df_crop = df_crop.append({'ExpName':name, 'CroppingBox':rectangle}, ignore_index=True)
-    return df_crop
+        crop_dict[name]=rectangle
+    return crop_dict
 
 def compose_matrix(imgs, dirname, lines = 8, bCompress = False):
     """
