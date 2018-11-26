@@ -4,7 +4,7 @@ with open("README.md", "r") as f:
     long_description = f.read()
 
 setup(name='xptools',
-      version='0.2',
+      version='0.3',
       description='Image and video analysis tools for experimental sciences',
       url='https://github.com/hlgirard/xptools',
       author='Henri-Louis Girard',
