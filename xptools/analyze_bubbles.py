@@ -11,19 +11,14 @@ from skimage.morphology import closing
 
 from scipy import ndimage as ndi
 
-from xptools.utils import imagetools, videotools
+# Package imports
+from xptools.utils import videotools
 
-
+# System imports
 import os
 import argparse
 from joblib import Parallel, delayed
-
-try:
-    from tqdm import tqdm
-    bTqdm = True
-except ImportError:
-    bTqdm = False
-
+import tqdm
 
 import matplotlib.pyplot as plt
 
@@ -93,14 +88,12 @@ def process_movie(file, crop_box = None, scale = 1, framerate = 1):
         Framerate of the video. Default is 1 frame / s
     Returns
     -------
-    Dataframe {'ExpName','Frame #', 'Time', 'Area', 'MinRow', 'MinCol', 'MaxRow', 'MaxCol','Height'}
-        A dataframe containing the results of the analysis
-        ExpName: string - Name of the file without the extension
-        Frame #: int - Frame number
-        Time: float - Time since start of the video (or icing event if bAuto = True)
-        Area: float - Area of the detected region
-        MinRow, MinCol, MaxRow, MaxCol: int - Coordinates of the bounding box of the detected region
-        Height: float - Height of the region calculated with area / (img.shape[0] * scale
+    DataFrame {'Frame', Label', 'Area', 'Eccentricity', 'Bbox Area'}
+        Frame (int): Frame number of the image
+        Label (int): Identifier for each bubble
+        Area (int): area of the detected bubble (mm2)
+        Eccentricity (float): eccentricity of the region
+        Bbox Area (int): area of the bounding box (mm2)
     """
     #Open the file and get a stack of grayscale images
     stack = videotools.open_video(file)

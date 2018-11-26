@@ -18,6 +18,7 @@ setup(name='xptools',
           'joblib',
           'matplotlib',
           'av',
+          'tqdm'
       ],
       scripts=['bin/analyze_front','bin/display_image_matrix'],
       zip_safe=False)
