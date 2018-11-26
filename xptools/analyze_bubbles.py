@@ -11,10 +11,19 @@ from skimage.morphology import closing
 
 from scipy import ndimage as ndi
 
-from xptools.utils import imagetools
+from xptools.utils import imagetools, videotools
+
 
 import os
 import argparse
+from joblib import Parallel, delayed
+
+try:
+    from tqdm import tqdm
+    bTqdm = True
+except ImportError:
+    bTqdm = False
+
 
 import matplotlib.pyplot as plt
 
@@ -60,13 +69,59 @@ def analyze_bubbles(img, scale = 1, frame = 0):
     img_labeled, num_sec = ndi.label(img_segmented)
     #Get the properties of the labeled regions and construct a dataframe
     reg = regionprops(img_labeled, coordinates='rc')
-    columns= ['Frame','Label', 'Area', 'Eccentricity', 'Bbox Area']
-    df = pd.DataFrame(columns=columns)
-    df = df.append([{'Frame':frame, 'Label':i.label, 'Area':i.area/(scale**2), 'Eccentricity':i.eccentricity, 'Bbox Area':i.bbox_area/(scale**2)} for i in reg])
+    if len(reg) > 0:
+        columns= ['Frame','Label', 'Area', 'Eccentricity', 'Bbox Area']
+        df = pd.DataFrame(columns=columns, dtype = np.float64)
+        df = df.append([{'Frame':frame, 'Label':i.label, 'Area':i.area/(scale**2), 'Eccentricity':i.eccentricity, 'Bbox Area':i.bbox_area/(scale**2)} for i in reg])
+        return df
+    else:
+        return None
+
+def process_movie(file, crop_box = None, scale = 1, framerate = 1):
+    """
+    Process a video to determine the bubble distribution.
+    
+    Parameters
+    ----------
+    file : string
+        path of the video file to open
+    crop_box : tuple (int), optional
+        Coordinates of the cropping box in the format (minRow, minCol, maxRow, maxCol) based on numpy coordinates
+    scale : float, optional
+        Scaling factor in px/mm. Default is 1 px/mm
+    framerate : int, optional
+        Framerate of the video. Default is 1 frame / s
+    Returns
+    -------
+    Dataframe {'ExpName','Frame #', 'Time', 'Area', 'MinRow', 'MinCol', 'MaxRow', 'MaxCol','Height'}
+        A dataframe containing the results of the analysis
+        ExpName: string - Name of the file without the extension
+        Frame #: int - Frame number
+        Time: float - Time since start of the video (or icing event if bAuto = True)
+        Area: float - Area of the detected region
+        MinRow, MinCol, MaxRow, MaxCol: int - Coordinates of the bounding box of the detected region
+        Height: float - Height of the region calculated with area / (img.shape[0] * scale
+    """
+    #Open the file and get a stack of grayscale images
+    stack = videotools.open_video(file)
+    if crop_box != None:
+        #Select the region of interest
+        (minRow, minCol, maxRow, maxCol) = crop_box
+        #Crop the stack to the right dimensions
+        stack = [img[minRow:maxRow,minCol:maxCol] for img in stack]
+    #Create a dataframe to hold the data
+    df = pd.DataFrame(dtype=np.float64)
+    #Analyze pics and drop data in dataframe
+    for i in tqdm(range(len(stack))):
+        result = analyze_bubbles(stack[i], scale, i)
+        if result is not None:
+            df = df.append(result, ignore_index = True)
+    #Determine time for each frame
+    df['Time'] = df['Frame']/framerate
+    #Return the dataframe
     return df
 
-
-def plot_buble_area_hist(df, bSave = False, dirname = None):
+def plot_bubble_area_hist(df, bSave = False, dirname = None):
     """Plots a histogram of the area of the bubbles
     """
 
@@ -95,7 +150,82 @@ def plot_buble_area_hist(df, bSave = False, dirname = None):
     plotly.offline.plot(fig, auto_open=True)
 
     if bSave:
-        pio.write_image(fig, dirname + '/' + 'FrontHeight.pdf')
+        pio.write_image(fig, dirname + '/' + 'BubbleHist.pdf')
+
+def plot_bubble_area_dist(df, bSave = False, dirname = None):
+    """Plots the distribution of bubble size for each frame
+    """
+
+    import plotly
+    from plotly import tools
+    import plotly.graph_objs as go
+    import plotly.io as pio
+
+    #Everything is plotted for each frame of the video
+    gf = df.groupby('Frame')
+
+    # Functions return the first and third quartile
+    def q1(x): return x.quantile(0.25)
+    def q3(x): return x.quantile(0.75)
+
+    #Plot the distribution of bubble size as a function of time
+
+    trace_q1 = go.Scatter(
+        x = gf.Time.agg('median'),
+        y = gf.Area.agg(q1),
+        mode = 'lines',
+        line = dict(width= 0),
+        xaxis='x2',
+        yaxis='y2',
+        name = 'Q1'
+    )
+
+    trace_q3 = go.Scatter(
+        x = gf.Time.agg('median'),
+        y = gf.Area.agg(q3),
+        fill = 'tonexty',
+        mode = 'none',
+        xaxis='x2',
+        yaxis='y2',
+        name = 'Q3'
+    )
+
+    trace_mean = go.Scatter(
+        x = gf.Time.agg('median'),
+        y = gf.Area.agg('median'),
+        xaxis='x2',
+        yaxis='y2',
+        name = 'mean'
+    )
+    
+    #Plot the number of bubbles detected as a function of time
+    trace_num = go.Scatter(
+        x = gf.Time.agg('median'),
+        y = gf.size(),
+        name = 'Number'
+    )
+
+    fig = tools.make_subplots(rows=2, cols=1)
+
+    fig.append_trace(trace_q1, 2, 1)
+    fig.append_trace(trace_q3, 2, 1)
+    fig.append_trace(trace_mean, 2, 1)
+    fig.append_trace(trace_num, 1, 1)
+
+    fig['layout'].update(
+        width = 800,
+        height = 800,
+        showlegend=False)
+
+    fig['layout']['yaxis1'].update(title='Number', range=(0,1500), linecolor = 'black',linewidth = 2, mirror = True)
+    fig['layout']['yaxis2'].update(title='Area', range=(0,200), linecolor = 'black',linewidth = 2, mirror = True, anchor='x2')
+    fig['layout']['xaxis1'].update(title='Time', linecolor = 'black',linewidth = 2, mirror = True)
+    fig['layout']['xaxis2'].update(title='Time', linecolor = 'black',linewidth = 2, mirror = True)
+
+    plotly.offline.plot(fig, auto_open=True)
+
+    if bSave:
+        pio.write_image(fig, dirname + '/' + 'BubbleDist.pdf')
 
 def main():
     #Setup parser
@@ -104,6 +234,7 @@ def main():
     ap.add_argument("-r", "--reprocess", action='store_true', help="Force the reprocessing of the images")
     ap.add_argument("-p", "--plotly", action='store_true', help="Use plotly instead of matplotlib for graphing")
     ap.add_argument("-s", "--save", action='store_true', help="Save the resulting plot")
+    ap.add_argument("-f", "--framerate", type=int, default=1, help="Frame rate (default = 1)")
     ap.add_argument("-c", "--scale", type=float, default=1, help="Scale factor in px/mm (default = 1)")
 
     #Retrieve arguments
@@ -112,17 +243,18 @@ def main():
     dirname = args.directory
     bReprocess = args.reprocess
     bPlotly = args.plotly
+    framerate = args.framerate
     bSave = args.save
     scale = args.scale
 
     # File or directory?
     isFile = False
 
-    if os.path.isfile(dirname) and dirname.endswith('.png'):
+    if os.path.isfile(dirname) and (dirname.endswith('.avi') or dirname.endswith('.AVI')):
         file_list=[os.path.abspath(dirname)]
         isFile = True
     elif os.path.isdir(dirname):
-        file_list = [dirname + '/' + file for file in os.listdir(dirname) if file.endswith('.png')]
+        file_list = [dirname + '/' + file for file in os.listdir(dirname) if (dirname.endswith('.avi') or dirname.endswith('.AVI'))]
     else:
         raise ValueError('Invalid file or directory.')
 
@@ -139,17 +271,30 @@ def main():
     else:
         savepath = dirname+"/"+"ProcessedData"+".pkl"
 
-    #Obtain cropping boxes
-    dict_crop = imagetools.obtain_cropping_boxes(file_list)
+    #If the movies have been processed already, load from disk, otherwise process now
+    if os.path.isfile(savepath) and not bReprocess:
+        df = pd.read_pickle(savepath)
+        print("Data loaded from disk")
+    else:
+        print("Processing movies")
+        dict_crop = videotools.obtain_cropping_boxes(file_list)
+        #Make a list with file names and cropping boxes
+        vid_list = []
+        for file in file_list:
+            name = file.split('.')[0].split('/')[-1]
+            cropping_box = dict_crop[name]
+            vid_list.append((file, cropping_box))
+        #Run the movie analysis in parallel (one thread per movie)
+        #df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, box, scale, framerate) for (file, box) in vid_list)
+        df_list = []
+        for (file, box) in vid_list:
+            df_list.append(process_movie(file, box, scale, framerate))
+        #Merge all the dataframes in one and reindex
+        df = pd.concat(df_list).reset_index(drop=True)
+        #Save dataframe to disk
+        df.to_pickle(savepath)
 
-    #Process all files
-    for file in file_list:
-        name = file.split('.')[0].split('/')[-1]
-        (minRow, minCol, maxRow, maxCol) = dict_crop[name]
-        img = io.imread(file)
-        img_cropped = img[minRow:maxRow,minCol:maxCol]
-        df = analyze_bubbles(img_cropped, scale, 0)
-        plot_buble_area_hist(df, bSave, savepath)
+    plot_bubble_area_dist(df, bSave, dirname)
 
 
 
