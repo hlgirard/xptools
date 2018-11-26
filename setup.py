@@ -20,5 +20,9 @@ setup(name='xptools',
           'av',
           'tqdm'
       ],
-      scripts=['bin/analyze_front','bin/display_image_matrix'],
+      scripts=[
+          'bin/analyze_front',
+          'bin/display_image_matrix',
+          'bin/analyze_bubbles'
+      ],
       zip_safe=False)

@@ -147,6 +147,7 @@ def plot_bubble_area_hist(df, bSave = False, dirname = None):
 
 def plot_bubble_area_dist(df, bSave = False, dirname = None):
     """Plots the distribution of bubble size for each frame
+    TODO: implement support for simultaneous plotting of different experiments
     """
 
     import plotly
