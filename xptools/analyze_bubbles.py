@@ -152,8 +152,7 @@ def plot_bubble_area_hist(df, bSave = False, dirname = None):
         pio.write_image(fig, dirname + '/' + 'BubbleHist.pdf')
 
 def plot_bubble_area_dist(df, bSave = False, dirname = None):
-    """Plots the distribution of bubble size for each frame
-    TODO: implement support for simultaneous plotting of different experiments
+    """Plots the distribution of bubble size and number of bubbles for each frame
     """
 
     import plotly
@@ -237,7 +236,7 @@ def plot_bubble_area_dist(df, bSave = False, dirname = None):
         showlegend=True)
 
     fig['layout']['yaxis1'].update(title='Number of bubbles', range=(0,1500), linecolor = 'black',linewidth = 2, mirror = True)
-    fig['layout']['yaxis2'].update(title='Mean bubble area (mm$^2$)', range=(0,200), linecolor = 'black',linewidth = 2, mirror = True, anchor='x2')
+    fig['layout']['yaxis2'].update(title='Mean bubble area (mm<sup>2</sup>)', range=(0,200), linecolor = 'black',linewidth = 2, mirror = True, anchor='x2')
     fig['layout']['xaxis1'].update(title='Time', linecolor = 'black',linewidth = 2, mirror = True)
     fig['layout']['xaxis2'].update(title='Time', linecolor = 'black',linewidth = 2, mirror = True)
 
