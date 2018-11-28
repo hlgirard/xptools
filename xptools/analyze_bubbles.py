@@ -117,6 +117,8 @@ def process_movie(file, crop_box = None, scale = 1, framerate = 1):
     df['Time'] = df['Frame']/framerate
     #Add a column with the name of the processed file
     df['Name'] = name
+    #Add a column for Frame area
+    df['FrameArea'] = (stack[0].shape[0] * stack[0].shape[1]) / (scale**2)
     #Return the dataframe
     return df
 
@@ -165,6 +167,13 @@ def plot_bubble_area_dist(df, bSave = False, dirname = None):
     nf = df.groupby('Name')
     nf_keys = list(nf.groups.keys())
 
+    # Maximum bubble density and bubble area will be used to set the y-axis range
+    max_num = 0
+    max_area = 0
+
+    #Initialize the figure
+    fig = tools.make_subplots(rows=2, cols=1)
+
     for i in range(len(nf_keys)):
 
         expname = nf_keys[i]
@@ -180,6 +189,10 @@ def plot_bubble_area_dist(df, bSave = False, dirname = None):
         # Functions to return the first and third quartile
         def q1(x): return x.quantile(0.25)
         def q3(x): return x.quantile(0.75)
+
+        # Get the maximums to set the axis ranges
+        max_num = max(max_num, max(gf.size() / gf['FrameArea'].agg('median')))
+        max_area = max(max_area, max(gf.Area.agg(q3)))
 
         #Plot the distribution of bubble size as a function of time
 
@@ -217,13 +230,11 @@ def plot_bubble_area_dist(df, bSave = False, dirname = None):
         #Plot the number of bubbles detected as a function of time
         trace_num = go.Scatter(
             x = gf.Time.agg('median'),
-            y = gf.size(),
+            y = gf.size() / gf['FrameArea'].agg('median'),
             name = expname,
             legendgroup = expname,
             marker = dict(color = color)
         )
-
-        fig = tools.make_subplots(rows=2, cols=1)
 
         fig.append_trace(trace_q1, 2, 1)
         fig.append_trace(trace_q3, 2, 1)
@@ -235,10 +246,10 @@ def plot_bubble_area_dist(df, bSave = False, dirname = None):
         height = 800,
         showlegend=True)
 
-    fig['layout']['yaxis1'].update(title='Number of bubbles', range=(0,1500), linecolor = 'black',linewidth = 2, mirror = True)
-    fig['layout']['yaxis2'].update(title='Mean bubble area (mm<sup>2</sup>)', range=(0,200), linecolor = 'black',linewidth = 2, mirror = True, anchor='x2')
-    fig['layout']['xaxis1'].update(title='Time', linecolor = 'black',linewidth = 2, mirror = True)
-    fig['layout']['xaxis2'].update(title='Time', linecolor = 'black',linewidth = 2, mirror = True)
+    fig['layout']['yaxis1'].update(title='Bubble density (1/mm<sup>2</sup>)', range=(0,1.05 * max_num), linecolor = 'black',linewidth = 2, mirror = True)
+    fig['layout']['yaxis2'].update(title='Mean bubble area (mm<sup>2</sup>)', range=(0,1.05 * max_area), linecolor = 'black',linewidth = 2, mirror = True, anchor='x2')
+    fig['layout']['xaxis1'].update(title='Time (s)', linecolor = 'black',linewidth = 2, mirror = True)
+    fig['layout']['xaxis2'].update(title='Time (s)', linecolor = 'black',linewidth = 2, mirror = True)
 
     plotly.offline.plot(fig, auto_open=True)
 
@@ -272,7 +283,7 @@ def main():
         file_list=[os.path.abspath(dirname)]
         isFile = True
     elif os.path.isdir(dirname):
-        file_list = [dirname + '/' + file for file in os.listdir(dirname) if (dirname.endswith('.avi') or dirname.endswith('.AVI'))]
+        file_list = [dirname + '/' + file for file in os.listdir(dirname) if (file.endswith('.avi') or file.endswith('.AVI'))]
     else:
         raise ValueError('Invalid file or directory.')
 
@@ -303,10 +314,7 @@ def main():
             cropping_box = dict_crop[name]
             vid_list.append((file, cropping_box))
         #Run the movie analysis in parallel (one thread per movie)
-        #df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, box, scale, framerate) for (file, box) in vid_list)
-        df_list = []
-        for (file, box) in vid_list:
-            df_list.append(process_movie(file, box, scale, framerate))
+        df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, box, scale, framerate) for (file, box) in vid_list)
         #Merge all the dataframes in one and reindex
         df = pd.concat(df_list).reset_index(drop=True)
         #Save dataframe to disk
