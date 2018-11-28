@@ -4,8 +4,10 @@ with open("README.md", "r") as f:
     long_description = f.read()
 
 setup(name='xptools',
-      version='0.35',
+      version='0.37post1',
       description='Image and video analysis tools for experimental sciences',
+      long_description=long_description,
+      long_description_content_type="text/markdown",
       url='https://github.com/hlgirard/xptools',
       author='Henri-Louis Girard',
       author_email='hl.girard@gmail.com',
