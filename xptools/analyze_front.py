@@ -251,12 +251,12 @@ def main():
         print("Data loaded from disk")
     else:
         print("Processing movies")
-        df_crop = videotools.obtain_cropping_boxes(file_list)
+        dict_crop = videotools.obtain_cropping_boxes(file_list)
         #Make a list with file names and cropping boxes
         vid_list = []
         for file in file_list:
             name = file.split('.')[0].split('/')[-1]
-            cropping_box = df_crop[df_crop['ExpName'] == name]['CroppingBox'].iloc[0]
+            cropping_box = dict_crop[name]
             vid_list.append((file, cropping_box))
         #Run the movie analysis in parallel (one thread per movie)
         df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, box, scale, framerate, bAuto) for (file, box) in vid_list)

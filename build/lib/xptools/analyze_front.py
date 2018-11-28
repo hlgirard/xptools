@@ -198,7 +198,7 @@ def plot_front_position_pltly(df, bSave, dirname):
         pio.write_image(fig, dirname + '/' + 'FrontHeight.pdf')
 
 
-if __name__ == '__main__':
+def main():
 
     #Setup parser
     ap = argparse.ArgumentParser()
@@ -221,8 +221,12 @@ if __name__ == '__main__':
     framerate = args.framerate
     bAuto = args.autoprocess
 
+    # File or directory?
+    isFile = False
+
     if os.path.isfile(dirname) and dirname.endswith('.avi'):
-        file_list=dirname
+        file_list=[os.path.abspath(dirname)]
+        isFile = True
     elif os.path.isdir(dirname):
         file_list = [dirname + '/' + file for file in os.listdir(dirname) if file.endswith('.avi')]
     else:
@@ -234,7 +238,12 @@ if __name__ == '__main__':
     print("Files to process: " + str(file_list))
     
     #Save path for the processed dataframe
-    savepath = dirname+"/"+"ProcessedData"+".pkl"
+    if isFile:
+        savedir = os.path.abspath(os.path.dirname(dirname))
+        filename = dirname.split('.')[0].split('/')[-1]
+        savepath = savedir+"/"+"ProcessedData_"+filename+".pkl"
+    else:
+        savepath = dirname+"/"+"ProcessedData"+".pkl"
 
     #If the movies have been processed already, load from disk, otherwise process now
     if os.path.isfile(savepath) and not bReprocess:
@@ -242,12 +251,12 @@ if __name__ == '__main__':
         print("Data loaded from disk")
     else:
         print("Processing movies")
-        df_crop = videotools.obtain_cropping_boxes(file_list)
+        dict_crop = videotools.obtain_cropping_boxes(file_list)
         #Make a list with file names and cropping boxes
         vid_list = []
         for file in file_list:
             name = file.split('.')[0].split('/')[-1]
-            cropping_box = df_crop[df_crop['ExpName'] == name]['CroppingBox'].iloc[0]
+            cropping_box = dict_crop[name]
             vid_list.append((file, cropping_box))
         #Run the movie analysis in parallel (one thread per movie)
         df_list = Parallel(n_jobs=-2, verbose=10)(delayed(process_movie)(file, box, scale, framerate, bAuto) for (file, box) in vid_list)
@@ -262,3 +271,5 @@ if __name__ == '__main__':
         plot_front_position(df, bSave, dirname)
 
 
+if __name__ == '__main__':
+    main()
