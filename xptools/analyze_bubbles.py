@@ -18,7 +18,7 @@ from xptools.utils import videotools
 import os
 import argparse
 from joblib import Parallel, delayed
-import tqdm
+from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 
@@ -88,13 +88,17 @@ def process_movie(file, crop_box = None, scale = 1, framerate = 1):
         Framerate of the video. Default is 1 frame / s
     Returns
     -------
-    DataFrame {'Frame', Label', 'Area', 'Eccentricity', 'Bbox Area'}
+    DataFrame {'Name','Time','Frame', Label', 'Area', 'Eccentricity', 'Bbox Area'}
+        Name (str): Name of the video processed taken from filename
+        Time (float): Calculated as Frame # / framerate
         Frame (int): Frame number of the image
         Label (int): Identifier for each bubble
         Area (int): area of the detected bubble (mm2)
         Eccentricity (float): eccentricity of the region
         Bbox Area (int): area of the bounding box (mm2)
     """
+    #Extract experiment name from filename
+    name = file.split('.')[0].split('/')[-1]
     #Open the file and get a stack of grayscale images
     stack = videotools.open_video(file)
     if crop_box != None:
@@ -111,6 +115,8 @@ def process_movie(file, crop_box = None, scale = 1, framerate = 1):
             df = df.append(result, ignore_index = True)
     #Determine time for each frame
     df['Time'] = df['Frame']/framerate
+    #Add a column with the name of the processed file
+    df['Name'] = name
     #Return the dataframe
     return df
 
@@ -152,67 +158,86 @@ def plot_bubble_area_dist(df, bSave = False, dirname = None):
 
     import plotly
     from plotly import tools
+    from plotly.colors import DEFAULT_PLOTLY_COLORS
     import plotly.graph_objs as go
     import plotly.io as pio
 
-    #Everything is plotted for each frame of the video
-    gf = df.groupby('Frame')
+    # Each experiment is plotted as a different trace.
+    nf = df.groupby('Name')
+    nf_keys = list(nf.groups.keys())
 
-    # Functions return the first and third quartile
-    def q1(x): return x.quantile(0.25)
-    def q3(x): return x.quantile(0.75)
+    for i in range(len(nf_keys)):
 
-    #Plot the distribution of bubble size as a function of time
+        expname = nf_keys[i]
+        expdf = nf.get_group(expname)
 
-    trace_q1 = go.Scatter(
-        x = gf.Time.agg('median'),
-        y = gf.Area.agg(q1),
-        mode = 'lines',
-        line = dict(width= 0),
-        xaxis='x2',
-        yaxis='y2',
-        name = 'Q1'
-    )
+        # All the traces from an experiment should be the same color from the plotly default colors
+        color = DEFAULT_PLOTLY_COLORS[i]
+        trans_color = color[:3] + 'a' + color[3:-1] + ', 0.2)'
 
-    trace_q3 = go.Scatter(
-        x = gf.Time.agg('median'),
-        y = gf.Area.agg(q3),
-        fill = 'tonexty',
-        mode = 'none',
-        xaxis='x2',
-        yaxis='y2',
-        name = 'Q3'
-    )
+        #Everything is plotted for each frame of the video
+        gf = expdf.groupby('Frame')
 
-    trace_mean = go.Scatter(
-        x = gf.Time.agg('median'),
-        y = gf.Area.agg('median'),
-        xaxis='x2',
-        yaxis='y2',
-        name = 'mean'
-    )
-    
-    #Plot the number of bubbles detected as a function of time
-    trace_num = go.Scatter(
-        x = gf.Time.agg('median'),
-        y = gf.size(),
-        name = 'Number'
-    )
+        # Functions to return the first and third quartile
+        def q1(x): return x.quantile(0.25)
+        def q3(x): return x.quantile(0.75)
 
-    fig = tools.make_subplots(rows=2, cols=1)
+        #Plot the distribution of bubble size as a function of time
 
-    fig.append_trace(trace_q1, 2, 1)
-    fig.append_trace(trace_q3, 2, 1)
-    fig.append_trace(trace_mean, 2, 1)
-    fig.append_trace(trace_num, 1, 1)
+        trace_q1 = go.Scatter(
+            x = gf.Time.agg('median'),
+            y = gf.Area.agg(q1),
+            mode = 'lines',
+            line = dict(width= 0, color = color),
+            name = 'Q1',
+            legendgroup = expname,
+            showlegend=False
+        )
+
+        trace_q3 = go.Scatter(
+            x = gf.Time.agg('median'),
+            y = gf.Area.agg(q3),
+            fill = 'tonexty',
+            fillcolor=trans_color,
+            mode = 'lines',
+            line = dict(width= 0, color = color),
+            name = 'Q3',
+            legendgroup = expname,
+            showlegend=False
+        )
+
+        trace_mean = go.Scatter(
+            x = gf.Time.agg('median'),
+            y = gf.Area.agg('median'),
+            name = 'mean',
+            legendgroup = expname,
+            marker = dict(color = color),
+            showlegend=False
+        )
+        
+        #Plot the number of bubbles detected as a function of time
+        trace_num = go.Scatter(
+            x = gf.Time.agg('median'),
+            y = gf.size(),
+            name = expname,
+            legendgroup = expname,
+            marker = dict(color = color)
+        )
+
+        fig = tools.make_subplots(rows=2, cols=1)
+
+        fig.append_trace(trace_q1, 2, 1)
+        fig.append_trace(trace_q3, 2, 1)
+        fig.append_trace(trace_mean, 2, 1)
+        fig.append_trace(trace_num, 1, 1)
 
     fig['layout'].update(
         width = 800,
         height = 800,
-        showlegend=False)
+        showlegend=True)
 
-    fig['layout']['yaxis1'].update(title='Number', range=(0,1500), linecolor = 'black',linewidth = 2, mirror = True)
-    fig['layout']['yaxis2'].update(title='Area', range=(0,200), linecolor = 'black',linewidth = 2, mirror = True, anchor='x2')
+    fig['layout']['yaxis1'].update(title='Number of bubbles', range=(0,1500), linecolor = 'black',linewidth = 2, mirror = True)
+    fig['layout']['yaxis2'].update(title='Mean bubble area (mm$^2$)', range=(0,200), linecolor = 'black',linewidth = 2, mirror = True, anchor='x2')
     fig['layout']['xaxis1'].update(title='Time', linecolor = 'black',linewidth = 2, mirror = True)
     fig['layout']['xaxis2'].update(title='Time', linecolor = 'black',linewidth = 2, mirror = True)
 
