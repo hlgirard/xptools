@@ -4,7 +4,7 @@ import numpy as np
 from skimage import io, img_as_ubyte, exposure
 from skimage.color import rgb2gray
 from skimage.feature import peak_local_max
-from skimage.filters import threshold_otsu
+from skimage.filters import threshold_minimum
 from skimage.segmentation import watershed
 from skimage.measure import label, regionprops
 from skimage.morphology import closing
@@ -45,31 +45,34 @@ def analyze_bubbles(img, scale = 1, frame = 0):
         Bbox Area (int): area of the bounding box (mm2)
     """
 
-    #Convert to grayscale
-    img_gray = img_as_ubyte(rgb2gray(img))
-    #Threshold the image (otsu) to get the bubbles
-    img_bin = img_gray > threshold_otsu(img_gray)
-    #Close holes in bubbles
-    img_closed = closing(img_bin)
-    #Compute distance to background
-    dist = ndi.distance_transform_edt(img_closed)
-    #Stretch contrast of the distance image
-    dist_cont = exposure.rescale_intensity(dist, in_range='image')
-    #Find local maximas in distance image and make them markers for the watershed
-    local_maxi = peak_local_max(dist_cont, indices=False, footprint=np.ones((10, 10)))
-    markers, num_max = ndi.label(local_maxi)
-    #Run a watershed algorithm to separate the bubbles
-    img_segmented = watershed(-dist_cont, markers, mask = img_closed, watershed_line=True)
-    #Label the segmented image
-    img_labeled, num_sec = ndi.label(img_segmented)
-    #Get the properties of the labeled regions and construct a dataframe
-    reg = regionprops(img_labeled, coordinates='rc')
-    if len(reg) > 0:
-        columns= ['Frame','Label', 'Area', 'Eccentricity', 'Bbox Area']
-        df = pd.DataFrame(columns=columns, dtype = np.float64)
-        df = df.append([{'Frame':frame, 'Label':i.label, 'Area':i.area/(scale**2), 'Eccentricity':i.eccentricity, 'Bbox Area':i.bbox_area/(scale**2)} for i in reg])
-        return df
-    else:
+    try:
+        #Convert to grayscale
+        img_gray = img_as_ubyte(rgb2gray(img))
+        #Threshold the image (otsu) to get the bubbles
+        img_bin = img_gray > threshold_minimum(img_gray)
+        #Close holes in bubbles
+        img_closed = closing(img_bin)
+        #Compute distance to background
+        dist = ndi.distance_transform_edt(img_closed)
+        #Stretch contrast of the distance image
+        dist_cont = exposure.rescale_intensity(dist, in_range='image')
+        #Find local maximas in distance image and make them markers for the watershed
+        local_maxi = peak_local_max(dist_cont, indices=False, footprint=np.ones((10, 10)))
+        markers, num_max = ndi.label(local_maxi)
+        #Run a watershed algorithm to separate the bubbles
+        img_segmented = watershed(-dist_cont, markers, mask = img_closed, watershed_line=True)
+        #Label the segmented image
+        img_labeled, num_sec = ndi.label(img_segmented)
+        #Get the properties of the labeled regions and construct a dataframe
+        reg = regionprops(img_labeled, coordinates='rc')
+        if len(reg) > 0:
+            columns= ['Frame','Label', 'Area', 'Eccentricity', 'Bbox Area']
+            df = pd.DataFrame(columns=columns, dtype = np.float64)
+            df = df.append([{'Frame':frame, 'Label':i.label, 'Area':i.area/(scale**2), 'Eccentricity':i.eccentricity, 'Bbox Area':i.bbox_area/(scale**2)} for i in reg])
+            return df
+        else:
+            return None
+    except:
         return None
 
 def process_movie(file, crop_box = None, scale = 1, framerate = 1):
