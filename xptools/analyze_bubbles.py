@@ -301,6 +301,7 @@ def main():
         filename = dirname.split('.')[0].split('/')[-1]
         savepath = savedir+"/"+"ProcessedData_"+filename+".pkl"
     else:
+        savedir = dirname
         savepath = dirname+"/"+"ProcessedData"+".pkl"
 
     #If the movies have been processed already, load from disk, otherwise process now
@@ -323,7 +324,7 @@ def main():
         #Save dataframe to disk
         df.to_pickle(savepath)
 
-    plot_bubble_area_dist(df, bSave, dirname)
+    plot_bubble_area_dist(df, bSave, savedir)
 
 
 
