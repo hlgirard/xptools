@@ -24,17 +24,17 @@ analyze_front --plotly --scale 60 --framerate 30 moviedirectory/
 
 - analyze_bubbles - This script takes a movie (or directory of movies) showing bubbles on a surface (bright on dark). It uses a watershed segmentation algorithm to identify the bubbles and characterize their size. It then plots the bubble density and mean size of bubbles as a function of time.
 
-'''
+```
 analyze_bubbles --plotly --scale 60 bubble_movie.avi
-'''
+```
 
 ![screenshot](docs/screenshots/analyze_bubbles_ex-01.jpg)
 
 - analyze_crystals - This script takes a directory containing pictures of droplets containing crystals (under cross polarization). It uses a thresholding algorithm to segment the crystals and count them.
 
-'''
+```
 analyze_crystals --plotly --key funct_key.txt imagedirectory/
-'''
+```
 
 ![screenshot](docs/screenshots/analyze_crystals_ex-01.jpg)
 
