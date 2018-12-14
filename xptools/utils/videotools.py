@@ -45,7 +45,7 @@ def determine_threshold(stack):
 
     TODO: increase robustness by comparing thresholds obtained on different images and choosing the best one.
     """
-    img = stack[int(len(stack)*0.75)]
+    img = stack[int(len(stack)*0.25)]
     return threshold_minimum(img)
 
 def obtain_cropping_boxes(file_list):
