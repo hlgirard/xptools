@@ -22,7 +22,7 @@ analyze_front --plotly --scale 60 --framerate 30 moviedirectory/
 
 ![screenshot](docs/screenshots/analyze_front_ex-01.jpg)
 
-- analyze_bubbles - This script takes a movie (or directory of movies) showing bubbles on a surface (bright on dark). It uses a watershed segmentation algorithm to identify the bubbles and characterize their size. It then plots the bubble density and mean size of bubbles as a function of time.
+- analyze_bubbles - This script takes a movie (or directory of movies) showing bubbles on a surface (bright on dark). It uses a watershed segmentation algorithm to identify the bubbles and characterize their size. It then plots the bubble density and mean size as a function of time.
 
 ```
 analyze_bubbles --plotly --scale 60 bubble_movie.avi
@@ -30,7 +30,7 @@ analyze_bubbles --plotly --scale 60 bubble_movie.avi
 
 ![screenshot](docs/screenshots/analyze_bubbles_ex-01.jpg)
 
-- analyze_crystals - This script takes a directory containing pictures of droplets containing crystals (under cross polarization). It uses a thresholding algorithm to segment the crystals and count them.
+- analyze_crystals - This script takes a directory containing pictures of droplets containing crystals (under cross polarization). It uses a thresholding algorithm to segment the crystals, count them and measure their size.
 
 ```
 analyze_crystals --plotly --key funct_key.txt imagedirectory/
@@ -64,12 +64,15 @@ Several utilities are included in the submodule utils including:
 import pandas as pd
 from xptools.utils import videotools
 
-df_crop = obtain_cropping_boxes(['Film1.avi','Film2.avi'])
-g_crop = df_crop.groupby('ExpName')
+video_list = ['Film1.avi','Film2.avi']
 
-for name in g_crop.groups.keys():
-    (minRow, minCol, maxRow, maxCol) = g_crop.get_group[name]['CroppingBox']
+dict_crop = videotools.obtain_cropping_boxes(video_list)
+
+for key, val in dict_crop:
+    stack = videotools.open_video(key)
+    (minRow, minCol, maxRow, maxCol) = val
     stack = [img[minRow:maxRow,minCol:maxCol] for img in stack]
+    process(stack)
 ```
 
 ## Notebooks
