@@ -4,10 +4,18 @@ Analysis tools for experimental sciences to display images, detect particles (ce
 
 ## Installation
 
-Install from pip with the command
+xptools is on PyPI so you can install it straight from pip with the command
 
 ```
 pip install xptools
+```
+
+Alternatively, you can clone the repository to your local computer and install from source
+
+```
+git clone https://github.com/hlgirard/xptools
+cd xptools
+pip install .
 ```
 
 ## Scripts
