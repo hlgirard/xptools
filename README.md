@@ -1,5 +1,7 @@
 # xptools
 
+[![PyPI version](https://badge.fury.io/py/xptools.svg)](https://badge.fury.io/py/xptools)
+
 Analysis tools for experimental sciences to display images, detect particles (cells, bubbles, crystals), moving fronts and analyze their shape, size and distibution.
 
 ## Installation
@@ -85,8 +87,9 @@ for key, val in dict_crop:
 
 ## Notebooks
 
-- BroadSpectrumTesting.ipynb - Tests different image analysis techniques to determine which is most appropriate
-- FocusedAnalysis.ipynb - Implements a specific analysis and plots the resulting size and number distributions for the particles
+- SegmentationBroadSpectrum.ipynb - Tests different image segmentation techniques to determine which is most appropriate
+- SegmentationFocused.ipynb - Implements a specific analysis and plots the resulting size and number distributions for the particles
+- Watershed_Segmentation.ipynb - Implements Watershed segmentation.
 
 ## Credits
 
