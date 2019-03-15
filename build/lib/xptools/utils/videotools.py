@@ -45,7 +45,7 @@ def determine_threshold(stack):
 
     TODO: increase robustness by comparing thresholds obtained on different images and choosing the best one.
     """
-    img = stack[len(stack)//2]
+    img = stack[int(len(stack)*0.25)]
     return threshold_minimum(img)
 
 def obtain_cropping_boxes(file_list):
@@ -76,6 +76,6 @@ def obtain_cropping_boxes(file_list):
         #Select the region of interest
         rectangle = None
         while rectangle == None:
-            rectangle = select_roi.select_rectangle(stack[len(stack)- 10])
+            rectangle = select_roi.select_rectangle(stack[len(stack) - 10])
         dict_crop[name]=rectangle
     return dict_crop

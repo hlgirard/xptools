@@ -173,6 +173,7 @@ def plot_front_position_pltly(df, bSave, dirname):
     import plotly.io as pio
     
     data=[]
+    max_height = 0
 
     for i in range(len(df['ExpName'].unique())):
         data.append(go.Scatter(
@@ -181,13 +182,15 @@ def plot_front_position_pltly(df, bSave, dirname):
             name = df['ExpName'].unique()[i]
         ))
 
+        max_height = max(max_height, max(df[df['ExpName'] == df['ExpName'].unique()[i]]['Height']))
+
     fig = go.Figure({
         "data": data,
         "layout": go.Layout(
             width = 800,
             height = 500,
             xaxis=dict(title='Time (s)', linecolor = 'black',linewidth = 2, mirror = True),
-            yaxis=dict(title='Height of front (mm)',linecolor = 'black',linewidth = 2, mirror = True),
+            yaxis=dict(title='Height of front (mm)',range = (0,1.05*max_height),linecolor = 'black',linewidth = 2, mirror = True),
             showlegend=True
         )}
     )
