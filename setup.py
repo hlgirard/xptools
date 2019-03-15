@@ -14,6 +14,7 @@ setup(name='xptools',
       license='MIT',
       packages=find_packages(),
       install_requires=[
+          'opencv-python'
           'numpy',
           'pandas',
           'scikit-image',
