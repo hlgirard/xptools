@@ -4,7 +4,7 @@ with open("README.md", "r") as f:
     long_description = f.read()
 
 setup(name='xptools',
-      version='0.38',
+      version='0.38post1',
       description='Image and video analysis tools for experimental sciences',
       long_description=long_description,
       long_description_content_type="text/markdown",
@@ -14,14 +14,14 @@ setup(name='xptools',
       license='MIT',
       packages=find_packages(),
       install_requires=[
-          'opencv-python'
+          'opencv-python',
           'numpy',
           'pandas',
           'scikit-image',
           'joblib',
           'matplotlib',
           'av',
-          'tqdm'
+          'tqdm',
       ],
       scripts=[
           'bin/analyze_front',
